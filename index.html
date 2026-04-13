@@ -1,0 +1,2907 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>Sweet Candy AI</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── RESET ─────────────────────────────── */
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    :root{
+      --bg:       #0a0a0f;
+      --bg2:      #111118;
+      --bg3:      #1a1a28;
+      --surface:  rgba(255,255,255,0.05);
+      --border:   rgba(255,255,255,0.08);
+      --text:     #f0eef8;
+      --muted:    #7a7890;
+      --accent:   #c084fc;
+      --accent2:  #f472b6;
+      --accent3:  #818cf8;
+      --danger:   #f87171;
+      --success:  #34d399;
+      --glow:     rgba(192,132,252,0.15);
+      --r:        16px;
+      --rsm:      10px;
+      --font:     'DM Sans', sans-serif;
+      --display:  'Playfair Display', serif;
+    }
+    html,body{
+      background:var(--bg);
+      color:var(--text);
+      font-family:var(--font);
+      height:100%;
+      overflow:hidden;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* ── NOISE TEXTURE OVERLAY ──────────────── */
+    body::before{
+      content:'';
+      position:fixed;inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events:none;z-index:0;opacity:0.4;
+    }
+
+    /* ── APP SHELL ──────────────────────────── */
+    #app{
+      position:fixed;inset:0;
+      display:grid;
+      grid-template-rows:auto 1fr auto;
+      overflow:hidden;
+      z-index:1;
+      min-height:0;
+    }
+
+    /* ── HEADER ─────────────────────────────── */
+    .header{
+      display:flex;align-items:center;gap:12px;
+      padding:14px 16px 12px;
+      border-bottom:1px solid var(--border);
+      background:rgba(10,10,15,0.8);
+      backdrop-filter:blur(20px);
+      position:relative;z-index:10;
+    }
+    .header-avatar{
+      width:38px;height:38px;border-radius:50%;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;flex-shrink:0;
+      box-shadow:0 0 16px var(--glow);
+      cursor:pointer;transition:transform .2s;
+    }
+    .header-avatar:active{transform:scale(.93);}
+    .header-info{flex:1;min-width:0;}
+    .header-name{
+      font-family:var(--display);
+      font-size:16px;font-style:italic;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .header-status{
+      font-size:11px;color:var(--muted);margin-top:1px;
+      display:flex;align-items:center;gap:5px;
+    }
+    .status-dot{
+      width:6px;height:6px;border-radius:50%;
+      background:var(--success);
+      box-shadow:0 0 6px var(--success);
+      animation:pulse 2s infinite;
+    }
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+    .header-actions{display:flex;gap:6px;}
+    .hbtn{
+      width:34px;height:34px;border-radius:50%;
+      background:var(--surface);border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      font-size:16px;cursor:pointer;transition:all .2s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .hbtn:active{background:rgba(255,255,255,.1);transform:scale(.9);}
+
+    /* ── VIEWS ──────────────────────────────── */
+    .view{display:none;flex-direction:column;height:100%;overflow:hidden;min-height:0;}
+    .view.active{display:flex;}
+
+    /* ── CHAT VIEW ──────────────────────────── */
+    #chatMessages{
+      flex:1;overflow-y:auto;
+      padding:16px 14px;
+      display:flex;flex-direction:column;gap:10px;
+      scroll-behavior:smooth;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain;
+    }
+    #chatMessages::-webkit-scrollbar{width:3px;}
+    #chatMessages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+    /* Message bubbles */
+    .msg{
+      display:flex;align-items:flex-end;gap:8px;
+      animation:msgIn .25s ease both;
+    }
+    @keyframes msgIn{
+      from{opacity:0;transform:translateY(8px);}
+      to{opacity:1;transform:translateY(0);}
+    }
+    .msg.user{flex-direction:row-reverse;}
+    .msg-avatar{
+      width:26px;height:26px;border-radius:50%;flex-shrink:0;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex;align-items:center;justify-content:center;
+      font-size:13px;margin-bottom:2px;
+    }
+    .msg-bubble{
+      max-width:78%;padding:10px 14px;
+      border-radius:18px;font-size:14px;line-height:1.55;
+      word-break:break-word;position:relative;
+    }
+    .msg.ai .msg-bubble{
+      background:var(--bg3);
+      border:1px solid var(--border);
+      border-bottom-left-radius:4px;
+      color:var(--text);
+    }
+    .msg.user .msg-bubble{
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#fff;border-bottom-right-radius:4px;
+      box-shadow:0 4px 16px rgba(192,132,252,.3);
+    }
+    .msg-time{
+      font-size:10px;color:var(--muted);
+      margin-top:4px;padding:0 4px;
+      text-align:right;
+    }
+    .msg.ai .msg-time{text-align:left;}
+
+    /* Typing indicator */
+    .typing-bubble{
+      background:var(--bg3);border:1px solid var(--border);
+      border-radius:18px;border-bottom-left-radius:4px;
+      padding:12px 16px;display:flex;gap:5px;align-items:center;
+    }
+    .typing-dot{
+      width:7px;height:7px;border-radius:50%;
+      background:var(--muted);
+      animation:typingBounce 1.2s infinite;
+    }
+    .typing-dot:nth-child(2){animation-delay:.2s;}
+    .typing-dot:nth-child(3){animation-delay:.4s;}
+    @keyframes typingBounce{
+      0%,60%,100%{transform:translateY(0);opacity:.5;}
+      30%{transform:translateY(-6px);opacity:1;}
+    }
+
+    /* Welcome */
+    .welcome{
+      flex:1;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      padding:32px 24px;text-align:center;gap:16px;
+    }
+    .welcome-glow{
+      width:80px;height:80px;border-radius:50%;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex;align-items:center;justify-content:center;
+      font-size:36px;
+      box-shadow:0 0 40px var(--glow),0 0 80px rgba(192,132,252,.1);
+      animation:floatGlow 3s ease-in-out infinite;
+    }
+    @keyframes floatGlow{
+      0%,100%{transform:translateY(0);box-shadow:0 0 40px var(--glow);}
+      50%{transform:translateY(-6px);box-shadow:0 0 60px rgba(192,132,252,.25);}
+    }
+    .welcome-title{
+      font-family:var(--display);font-size:24px;
+      font-style:italic;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .welcome-sub{font-size:14px;color:var(--muted);line-height:1.6;max-width:260px;}
+
+    /* Quick suggestions */
+    .suggestions{
+      display:flex;flex-wrap:wrap;gap:8px;
+      padding:0 14px 12px;justify-content:center;
+    }
+    .suggestion{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:20px;padding:7px 14px;
+      font-size:13px;color:var(--text);
+      cursor:pointer;transition:all .18s;
+      -webkit-tap-highlight-color:transparent;
+      white-space:nowrap;
+    }
+    .suggestion:active{
+      background:rgba(192,132,252,.15);
+      border-color:var(--accent);color:var(--accent);
+      transform:scale(.96);
+    }
+
+    /* Chat input */
+    .chat-input-wrap{
+      padding:10px 12px;
+      border-top:1px solid var(--border);
+      background:rgba(10,10,15,.9);
+      backdrop-filter:blur(20px);
+      display:flex;align-items:flex-end;gap:8px;
+    }
+    #chatInput{
+      flex:1;background:var(--bg3);
+      border:1px solid var(--border);
+      border-radius:22px;padding:10px 16px;
+      color:var(--text);font-family:var(--font);font-size:14px;
+      resize:none;outline:none;max-height:120px;
+      min-height:42px;line-height:1.45;
+      transition:border-color .2s;
+      scrollbar-width:none;
+    }
+    #chatInput:focus{border-color:rgba(192,132,252,.4);}
+    #chatInput::placeholder{color:var(--muted);}
+    .send-btn{
+      width:42px;height:42px;border-radius:50%;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      border:none;color:#fff;font-size:18px;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;flex-shrink:0;transition:all .18s;
+      -webkit-tap-highlight-color:transparent;
+      box-shadow:0 4px 12px rgba(192,132,252,.3);
+    }
+    .send-btn:active{transform:scale(.9);opacity:.85;}
+    .send-btn:disabled{opacity:.4;cursor:default;transform:none;}
+
+    /* Attach & Voice buttons */
+    .attach-btn,.voice-btn{
+      width:36px;height:36px;border-radius:50%;
+      background:transparent;border:none;
+      font-size:18px;cursor:pointer;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      transition:all .18s;-webkit-tap-highlight-color:transparent;
+      opacity:.7;user-select:none;
+    }
+    .attach-btn:active,.voice-btn:active{opacity:1;transform:scale(.9);}
+    .voice-btn.recording{
+      background:rgba(248,113,113,.15);
+      border:2px solid var(--danger);
+      opacity:1;
+      animation:recordPulse 1s ease-in-out infinite;
+    }
+    @keyframes recordPulse{
+      0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,.4);}
+      50%{box-shadow:0 0 0 8px rgba(248,113,113,0);}
+    }
+    .record-timer{
+      position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+      background:rgba(248,113,113,.95);color:#fff;
+      padding:6px 18px;border-radius:20px;font-size:13px;font-weight:600;
+      display:none;z-index:50;
+      box-shadow:0 4px 16px rgba(248,113,113,.35);
+    }
+    .record-timer.show{display:block;}
+    .img-attach-preview{
+      margin:0 12px 8px;border-radius:var(--r);overflow:hidden;
+      border:1px solid var(--border);background:var(--bg3);
+      animation:msgIn .2s ease;
+    }
+    .img-attach-preview img{width:100%;max-height:180px;object-fit:cover;display:block;}
+    .img-attach-caption{display:flex;gap:8px;padding:8px 10px;align-items:center;}
+    .img-attach-caption input{
+      flex:1;background:transparent;border:none;
+      color:var(--text);font-family:var(--font);font-size:13px;outline:none;
+    }
+    .img-attach-caption input::placeholder{color:var(--muted);}
+    .img-attach-caption button{
+      padding:6px 12px;border-radius:var(--rsm);border:none;
+      font-size:12px;font-weight:600;cursor:pointer;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#fff;
+    }
+    .img-attach-caption button.cancel{
+      background:var(--surface);color:var(--muted);
+      border:1px solid var(--border);
+    }
+
+    /* ── CHARACTER VIEW ──────────────────────── */
+    .scrollable{
+      flex:1;
+      overflow-y:scroll !important;
+      -webkit-overflow-scrolling:touch !important;
+      overscroll-behavior:contain;
+      padding:16px;
+      display:flex;flex-direction:column;gap:12px;
+      min-height:0;
+      position:relative;
+    }
+    .scrollable::-webkit-scrollbar{width:3px;}
+    .scrollable::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+    .char-hero{
+      border-radius:var(--r);overflow:hidden;
+      background:linear-gradient(135deg,rgba(192,132,252,.12),rgba(244,114,182,.08));
+      border:1px solid rgba(192,132,252,.15);
+      padding:24px 20px;text-align:center;
+      position:relative;
+    }
+    .char-hero::before{
+      content:'';position:absolute;inset:0;
+      background:radial-gradient(ellipse at 50% 0,rgba(192,132,252,.15),transparent 70%);
+    }
+    .char-hero-emoji{font-size:56px;line-height:1;margin-bottom:10px;display:block;}
+    .char-hero-name{
+      font-family:var(--display);font-size:22px;font-style:italic;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      margin-bottom:6px;
+    }
+    .char-hero-desc{font-size:13px;color:var(--muted);line-height:1.6;}
+    .char-hero-badge{
+      display:inline-flex;align-items:center;gap:6px;
+      margin-top:12px;padding:5px 14px;border-radius:20px;
+      background:rgba(192,132,252,.12);border:1px solid rgba(192,132,252,.25);
+      font-size:12px;color:var(--accent);
+    }
+
+    .section-label{
+      font-size:11px;font-weight:600;text-transform:uppercase;
+      letter-spacing:.1em;color:var(--muted);padding:0 4px;
+    }
+
+    .gender-toggle{display:flex;gap:0;background:rgba(255,255,255,.06);border-radius:10px;padding:3px;margin-bottom:12px;}
+    .gender-btn{flex:1;padding:8px 0;border:none;border-radius:8px;background:transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent;}
+    .gender-btn.active{background:var(--accent);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(192,132,252,.3);}
+    .char-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .char-card{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r);padding:16px 12px;
+      text-align:center;cursor:pointer;
+      transition:all .2s;-webkit-tap-highlight-color:transparent;
+      position:relative;overflow:hidden;
+    }
+    .char-card::before{
+      content:'';position:absolute;inset:0;
+      background:linear-gradient(135deg,rgba(192,132,252,.08),transparent);
+      opacity:0;transition:opacity .2s;
+    }
+    .char-card:active::before,.char-card.selected::before{opacity:1;}
+    .char-card.selected{
+      border-color:rgba(192,132,252,.4);
+      box-shadow:0 0 16px rgba(192,132,252,.12);
+    }
+    .char-card:active{transform:scale(.97);}
+    .char-card-emoji{font-size:32px;margin-bottom:8px;display:block;}
+    .char-card-name{font-size:12px;font-weight:600;color:var(--text);line-height:1.3;}
+    .char-card-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4;}
+    .char-card-check{
+      position:absolute;top:8px;right:8px;
+      width:18px;height:18px;border-radius:50%;
+      background:var(--accent);color:#fff;
+      font-size:10px;display:none;
+      align-items:center;justify-content:center;
+    }
+    .char-card.selected .char-card-check{display:flex;}
+
+    .custom-char-area{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r);padding:16px;
+    }
+    .custom-char-area textarea{
+      width:100%;background:var(--bg3);border:1px solid var(--border);
+      border-radius:var(--rsm);padding:12px;color:var(--text);
+      font-family:var(--font);font-size:13px;line-height:1.55;
+      resize:none;outline:none;height:100px;
+      transition:border-color .2s;
+    }
+    .custom-char-area textarea:focus{border-color:rgba(192,132,252,.4);}
+    .custom-char-area textarea::placeholder{color:var(--muted);}
+
+    /* ── SETTINGS VIEW ──────────────────────── */
+    .settings-group{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--r);overflow:hidden;
+    }
+    .settings-row{
+      display:flex;align-items:center;gap:12px;
+      padding:14px 16px;cursor:pointer;transition:background .15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .settings-row:not(:last-child){border-bottom:1px solid var(--border);}
+    .settings-row:active{background:rgba(255,255,255,.04);}
+    .settings-icon{font-size:18px;flex-shrink:0;width:24px;text-align:center;}
+    .settings-text{flex:1;}
+    .settings-label{font-size:14px;font-weight:500;}
+    .settings-value{font-size:12px;color:var(--muted);margin-top:2px;}
+    .settings-arrow{color:var(--muted);font-size:16px;}
+    .settings-toggle{
+      width:44px;height:24px;border-radius:12px;
+      background:var(--border);position:relative;
+      transition:background .2s;flex-shrink:0;
+      cursor:pointer;
+    }
+    .settings-toggle.on{background:var(--accent);}
+    .settings-toggle::after{
+      content:'';position:absolute;
+      top:3px;left:3px;
+      width:18px;height:18px;border-radius:50%;
+      background:#fff;transition:transform .2s;
+      box-shadow:0 1px 4px rgba(0,0,0,.3);
+    }
+    .settings-toggle.on::after{transform:translateX(20px);}
+
+    /* ── CREDITS VIEW ───────────────────────── */
+    .credits-hero{
+      background:linear-gradient(135deg,rgba(192,132,252,.1),rgba(244,114,182,.08));
+      border:1px solid rgba(192,132,252,.15);
+      border-radius:var(--r);padding:20px;
+      display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+    }
+    .credit-block{text-align:center;}
+    .credit-emoji{font-size:26px;margin-bottom:6px;}
+    .credit-num{
+      font-size:24px;font-weight:600;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .credit-lbl{font-size:11px;color:var(--muted);margin-top:3px;}
+    .credit-reset{font-size:10px;color:var(--muted);margin-top:2px;}
+
+    /* ── SELECT SHEET ───────────────────────── */
+    .sheet-overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.6);
+      z-index:100;opacity:0;pointer-events:none;
+      transition:opacity .25s;backdrop-filter:blur(4px);
+      display:flex;align-items:flex-end;justify-content:center;
+    }
+    .sheet-overlay.open{opacity:1;pointer-events:all;}
+    .sheet{
+      position:relative;
+      width:100%;max-width:480px;
+      background:var(--bg2);border-radius:24px 24px 0 0;
+      padding:8px 0 env(safe-area-inset-bottom,20px);
+      transform:translateY(100%);
+      transition:transform .3s cubic-bezier(.32,0,.67,0);
+      max-height:75vh;
+      min-height:120px;
+      display:flex;flex-direction:column;
+      overflow:hidden;
+    }
+    .sheet-overlay.open .sheet{transform:translateY(0);}
+    .sheet-handle{
+      width:36px;height:4px;border-radius:2px;
+      background:var(--border);margin:12px auto 0;
+      flex-shrink:0;
+    }
+    .sheet-title{
+      font-size:16px;font-weight:600;
+      padding:16px 16px 8px;text-align:center;
+      flex-shrink:0;
+      border-bottom:1px solid var(--border);
+    }
+    .sheet-scroll{
+      flex:1;overflow-y:scroll;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain;
+      padding:8px 16px 24px;
+    }
+    .sheet-scroll::-webkit-scrollbar{width:3px;}
+    .sheet-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+    /* sheet-handle and sheet-title defined in sheet rewrite above */
+    .sheet-option{
+      display:flex;align-items:center;gap:12px;
+      padding:13px 12px;border-radius:var(--rsm);
+      cursor:pointer;transition:background .15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .sheet-option:active{background:rgba(255,255,255,.06);}
+    .sheet-option.selected{background:rgba(192,132,252,.1);}
+    .sheet-option-icon{font-size:20px;width:28px;text-align:center;}
+    .sheet-option-text{flex:1;}
+    .sheet-option-label{font-size:14px;font-weight:500;}
+    .sheet-option-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+    .sheet-option-check{color:var(--accent);font-size:16px;opacity:0;}
+    .sheet-option.selected .sheet-option-check{opacity:1;}
+    .sheet-custom-input{
+      width:100%;background:var(--bg3);border:1px solid var(--border);
+      border-radius:var(--rsm);padding:12px;color:var(--text);
+      font-family:var(--font);font-size:14px;resize:none;outline:none;
+      height:80px;margin-top:8px;transition:border-color .2s;
+    }
+    .sheet-custom-input:focus{border-color:rgba(192,132,252,.4);}
+
+    /* ── BOTTOM NAV ─────────────────────────── */
+    .bottom-nav{
+      display:flex;border-top:1px solid var(--border);
+      background:rgba(10,10,15,.9);backdrop-filter:blur(20px);
+      padding-bottom:env(safe-area-inset-bottom,0);
+      position:relative;z-index:10;
+    }
+    .nav-btn{
+      flex:1;display:flex;flex-direction:column;align-items:center;
+      padding:10px 4px;gap:4px;cursor:pointer;
+      transition:color .15s;color:var(--muted);
+      -webkit-tap-highlight-color:transparent;
+    }
+    .nav-btn.active{color:var(--accent);}
+    .nav-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;}
+    .nav-btn.active svg{stroke:var(--accent);}
+    .nav-label{font-size:10px;font-weight:500;}
+
+    /* ── BUTTON ─────────────────────────────── */
+    .btn{
+      width:100%;padding:14px;border-radius:var(--r);
+      font-family:var(--font);font-size:15px;font-weight:600;
+      cursor:pointer;border:none;transition:all .18s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .btn-primary{
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#fff;box-shadow:0 4px 20px rgba(192,132,252,.25);
+    }
+    .btn-primary:active{opacity:.85;transform:scale(.98);}
+    .btn-secondary{
+      background:var(--surface);border:1px solid var(--border);color:var(--text);
+    }
+    .btn-secondary:active{background:rgba(255,255,255,.08);}
+    .btn:disabled{opacity:.4;cursor:default;transform:none !important;}
+
+    /* ── TOAST ──────────────────────────────── */
+    #toast{
+      position:fixed;bottom:85px;left:50%;
+      transform:translateX(-50%) translateY(12px);
+      background:rgba(26,26,40,.95);color:var(--text);
+      padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;
+      opacity:0;transition:all .3s;pointer-events:none;
+      white-space:nowrap;backdrop-filter:blur(10px);
+      border:1px solid var(--border);z-index:200;
+    }
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    /* ── LOADING ────────────────────────────── */
+    #loadingScreen{
+      position:fixed;inset:0;background:var(--bg);
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:20px;
+      z-index:999;transition:opacity .4s;
+    }
+    #loadingScreen.hidden{opacity:0;pointer-events:none;}
+    .load-logo{
+      width:64px;height:64px;border-radius:50%;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex;align-items:center;justify-content:center;
+      font-size:28px;
+      box-shadow:0 0 40px var(--glow);
+      animation:floatGlow 2s ease-in-out infinite;
+    }
+    .load-text{
+      font-family:var(--display);font-size:20px;font-style:italic;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .load-bar{
+      width:120px;height:2px;background:var(--border);border-radius:1px;overflow:hidden;
+    }
+    .load-bar-inner{
+      height:100%;width:0;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      border-radius:1px;animation:loadBar 1.5s ease forwards;
+    }
+    @keyframes loadBar{to{width:100%;}}
+
+    /* ── IMAGE PREVIEW ──────────────────────── */
+    .img-preview{
+      border-radius:var(--r);overflow:hidden;
+      border:1px solid var(--border);
+      position:relative;cursor:pointer;
+    }
+    .img-preview img{width:100%;display:block;}
+    .img-actions{
+      position:absolute;bottom:0;left:0;right:0;
+      background:linear-gradient(transparent,rgba(0,0,0,.7));
+      padding:20px 12px 12px;
+      display:flex;gap:8px;justify-content:flex-end;
+    }
+    .img-btn{
+      background:rgba(255,255,255,.15);backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,.2);border-radius:20px;
+      padding:6px 14px;font-size:12px;color:#fff;cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .img-btn:active{background:rgba(255,255,255,.25);}
+
+    /* Generating state */
+    .generating{
+      border-radius:var(--r);border:1px solid var(--border);
+      background:var(--bg3);padding:32px;
+      display:flex;flex-direction:column;align-items:center;gap:14px;
+    }
+    .gen-spinner{
+      width:48px;height:48px;border-radius:50%;
+      border:3px solid var(--border);border-top-color:var(--accent);
+      animation:spin .9s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .gen-text{font-size:13px;color:var(--muted);text-align:center;line-height:1.5;}
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingScreen">
+  <div class="load-logo">🍬</div>
+  <div class="load-text">Sweet Candy AI</div>
+  <div class="load-bar"><div class="load-bar-inner"></div></div>
+</div>
+
+<!-- App -->
+<div id="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-avatar" id="headerAvatar" onclick="showView('char')">🍬</div>
+    <div class="header-info">
+      <div class="header-name" id="headerName">Sweet Candy</div>
+      <div class="header-status">
+        <div class="status-dot"></div>
+        <span id="headerStatus" data-i18n="status_online">всегда онлайн</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="hbtn" onclick="generateImage()" title="Генерировать образ" data-i18n-title="btn_gen_image">✨</div>
+      <div class="hbtn" onclick="generateVoice()" title="Голосовое" data-i18n-title="btn_voice">🎙</div>
+    </div>
+  </div>
+
+  <!-- CHAT VIEW -->
+  <div class="view active" id="viewChat">
+    <div id="chatMessages"></div>
+    <div class="suggestions" id="suggestions">
+      <div class="suggestion" onclick="sendSuggestion(this)" data-i18n="suggestion1">Расскажи о себе</div>
+      <div class="suggestion" onclick="sendSuggestion(this)" data-i18n="suggestion2">Как твой день?</div>
+      <div class="suggestion" onclick="sendSuggestion(this)" data-i18n="suggestion3">Сделай комплимент</div>
+      <div class="suggestion" onclick="sendSuggestion(this)" data-i18n="suggestion4">Что думаешь обо мне?</div>
+    </div>
+    <!-- Hidden file input -->
+    <input type="file" id="fileInput" accept="image/*" style="display:none"
+           onchange="handleFileSelect(event)"/>
+
+    <div class="chat-input-wrap">
+      <button class="attach-btn" id="attachBtn" onclick="document.getElementById('fileInput').click()"
+              title="Прикрепить фото" data-i18n-title="btn_attach">📎</button>
+      <textarea id="chatInput" placeholder="Напиши сообщение..." rows="1"
+        oninput="autoResize(this)" onkeydown="handleKey(event)"
+        data-i18n-placeholder="placeholder_chat"></textarea>
+      <button class="voice-btn" id="voiceBtn"
+              onpointerdown="startRecording()" onpointerup="stopRecording()"
+              onpointerleave="stopRecording()" title="Удержи для записи" data-i18n-title="btn_record">🎙</button>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+    </div>
+
+    <!-- Image preview before send -->
+    <div class="img-attach-preview" id="imgAttachPreview" style="display:none">
+      <img id="imgAttachThumb" src="" alt=""/>
+      <div class="img-attach-caption">
+        <input type="text" id="imgCaption" placeholder="Добавь подпись (необязательно)" data-i18n-placeholder="placeholder_caption"/>
+        <button onclick="sendImage()"><span data-i18n="btn_send_image">Отправить</span></button>
+        <button onclick="cancelImage()" class="cancel">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARACTER VIEW -->
+  <div class="view" id="viewChar">
+    <div class="scrollable">
+
+      <!-- Current character hero -->
+      <div class="char-hero" id="charHero">
+        <span class="char-hero-emoji" id="heroEmoji">🍬</span>
+        <div class="char-hero-name" id="heroName" data-i18n="hero_default_name">Выбери персонажа</div>
+        <div class="char-hero-desc" id="heroDesc" data-i18n="hero_default_desc">Выбери образ ниже — он определит стиль общения, голос и генерацию изображений</div>
+      </div>
+
+      <div class="section-label" data-i18n="section_presets">Пресеты</div>
+      <div class="gender-toggle">
+        <button class="gender-btn active" data-gender="female" onclick="setCharGender('female')" data-i18n="gender_female">Женский</button>
+        <button class="gender-btn" data-gender="male" onclick="setCharGender('male')" data-i18n="gender_male">Мужской</button>
+      </div>
+      <div class="char-grid" id="charGrid"></div>
+
+      <div class="section-label" data-i18n="section_custom">Своя модель</div>
+      <div class="custom-char-area">
+        <textarea id="customCharInput" placeholder="Опиши свою идеальную модель: внешность, характер, стиль, атмосфера...&#10;&#10;Например: Стройная азиатка с длинными тёмными волосами, умная и загадочная, в стиле dark academia..." data-i18n-placeholder="placeholder_custom"></textarea>
+        <div style="margin-top:10px;">
+          <button class="btn btn-primary" onclick="saveCustomChar()" data-i18n="btn_save_char">Сохранить образ</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS VIEW -->
+  <div class="view" id="viewSettings">
+    <div class="scrollable">
+
+      <div class="section-label" data-i18n="section_style">Стиль общения</div>
+      <div class="settings-group">
+        <div class="settings-row" onclick="openSheet('style')">
+          <div class="settings-icon">🎨</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="label_style">Стиль</div>
+            <div class="settings-value" id="valStyle">casual</div>
+          </div>
+          <div class="settings-arrow">›</div>
+        </div>
+        <div class="settings-row" onclick="openSheet('tone')">
+          <div class="settings-icon">🎭</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="label_tone">Тон</div>
+            <div class="settings-value" id="valTone">friendly</div>
+          </div>
+          <div class="settings-arrow">›</div>
+        </div>
+        <div class="settings-row" onclick="openSheet('verbosity')">
+          <div class="settings-icon">📝</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="label_volume">Объём</div>
+            <div class="settings-value" id="valVerbosity">normal</div>
+          </div>
+          <div class="settings-arrow">›</div>
+        </div>
+        <div class="settings-row" onclick="openSheet('language')">
+          <div class="settings-icon">🌍</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="label_language">Язык</div>
+            <div class="settings-value" id="valLanguage">auto</div>
+          </div>
+          <div class="settings-arrow">›</div>
+        </div>
+      </div>
+
+      <div class="section-label" data-i18n="section_more">Дополнительно</div>
+      <div class="settings-group">
+        <div class="settings-row">
+          <div class="settings-icon">🔔</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="label_notifications">Уведомления</div>
+            <div class="settings-value" data-i18n="val_notifications">Каждые 12 часов</div>
+          </div>
+          <div class="settings-toggle" id="notifyToggle" onclick="toggleNotify()"></div>
+        </div>
+        <div class="settings-row" onclick="clearHistory()">
+          <div class="settings-icon">🗑</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="label_clear_history">Очистить историю</div>
+            <div class="settings-value" data-i18n="val_clear_history">Начать разговор заново</div>
+          </div>
+          <div class="settings-arrow">›</div>
+        </div>
+      </div>
+
+      <div class="section-label" data-i18n="section_instructions">Инструкции</div>
+      <div class="custom-char-area">
+        <textarea id="instructionsInput" placeholder="Свои правила для ассистента. Например: Всегда отвечай по-русски. Обращайся ко мне на «ты»..." data-i18n-placeholder="placeholder_instructions"></textarea>
+        <div style="margin-top:10px;">
+          <button class="btn btn-primary" onclick="saveInstructions()" data-i18n="btn_save">Сохранить</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CREDITS VIEW -->
+  <div class="view" id="viewCredits">
+    <div class="scrollable">
+
+      <div class="credits-hero" id="creditsHero">
+        <div class="credit-block">
+          <div class="credit-emoji">🖼</div>
+          <div class="credit-num" id="cImg">—</div>
+          <div class="credit-lbl" data-i18n="credit_images">Изображений</div>
+          <div class="credit-reset" id="cImgReset"></div>
+        </div>
+        <div class="credit-block">
+          <div class="credit-emoji">🎙</div>
+          <div class="credit-num" id="cVoice">—</div>
+          <div class="credit-lbl" data-i18n="credit_voice">Голосовых</div>
+          <div class="credit-reset" id="cVoiceReset"></div>
+        </div>
+        <div class="credit-block">
+          <div class="credit-emoji">🎬</div>
+          <div class="credit-num" id="cVideo">—</div>
+          <div class="credit-lbl" data-i18n="credit_video">Видео</div>
+          <div class="credit-reset" id="cVideoReset"></div>
+        </div>
+      </div>
+
+      <div id="imageArea"></div>
+
+      <div class="section-label" data-i18n="section_ads">Реклама</div>
+      <div class="settings-group">
+        <div class="settings-row" onclick="watchAd('image')">
+          <div class="settings-icon">📺</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="ad_image_label">+2 кредита изображений</div>
+            <div class="settings-value" data-i18n="ad_watch">Посмотреть рекламу</div>
+          </div>
+          <div class="settings-arrow">›</div>
+        </div>
+        <div class="settings-row" onclick="watchAd('voice')">
+          <div class="settings-icon">📺</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="ad_voice_label">+2 кредита голосовых</div>
+            <div class="settings-value" data-i18n="ad_watch">Посмотреть рекламу</div>
+          </div>
+          <div class="settings-arrow">›</div>
+        </div>
+      </div>
+
+      <div class="section-label" data-i18n="section_buy">Купить за Stars ⭐</div>
+      <div class="settings-group">
+        <div class="settings-row">
+          <div class="settings-icon">🖼</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="buy_10img">10 изображений</div>
+            <div class="settings-value" data-i18n="buy_50stars">50 ⭐ Telegram Stars</div>
+          </div>
+          <div style="color:var(--accent);font-size:13px;font-weight:600;" data-i18n="btn_buy">Купить</div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-icon">🎙</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="buy_15voice">15 голосовых</div>
+            <div class="settings-value" data-i18n="buy_30stars">30 ⭐ Telegram Stars</div>
+          </div>
+          <div style="color:var(--accent);font-size:13px;font-weight:600;" data-i18n="btn_buy">Купить</div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-icon">🎁</div>
+          <div class="settings-text">
+            <div class="settings-label" data-i18n="buy_bundle">Бандл: всё вместе</div>
+            <div class="settings-value" data-i18n="buy_bundle_desc">120 ⭐ · 10 изо + 15 голос + 3 видео</div>
+          </div>
+          <div style="color:var(--accent);font-size:13px;font-weight:600;" data-i18n="btn_buy">Купить</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="nav-btn active" id="nav-chat" onclick="showView('chat')">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div class="nav-label" data-i18n="nav_chat">Чат</div>
+    </div>
+    <div class="nav-btn" id="nav-char" onclick="showView('char')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      <div class="nav-label" data-i18n="nav_char">Персонаж</div>
+    </div>
+    <div class="nav-btn" id="nav-settings" onclick="showView('settings')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <div class="nav-label" data-i18n="nav_settings">Настройки</div>
+    </div>
+    <div class="nav-btn" id="nav-credits" onclick="showView('credits')">
+      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <div class="nav-label" data-i18n="nav_credits">Кредиты</div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Select Sheet -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet(event)">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheetTitle"></div>
+    <div class="sheet-scroll" id="sheetContent"></div>
+  </div>
+</div>
+
+<!-- Record timer -->
+<div class="record-timer" id="recordTimer">🔴 0:00</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// CONFIG — UPDATE API_URL WHEN DEPLOYED
+// ════════════════════════════════════════════════════════
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8000'
+  : 'https://web-production-87fee.up.railway.app';
+
+// ── Telegram WebApp ──────────────────────────────────────
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const INIT_DATA = tg.initData || '';
+const TG_USER   = tg.initDataUnsafe?.user || {};
+
+const LANG_MAP = { ru:'ru', be:'ru', uk:'ru', en:'en', de:'de', fr:'fr', pl:'pl', es:'es', pt:'pt', id:'id' };
+let LANG = LANG_MAP[TG_USER.language_code?.split('-')[0]?.toLowerCase()] || 'en';
+// Override with profile language if explicitly set (not 'auto')
+function updateLang(profileLang) {
+  if (profileLang && profileLang !== 'auto') {
+    const map = { Russian:'ru', English:'en', German:'de', French:'fr', Polish:'pl', Spanish:'es', Portuguese:'pt', Indonesian:'id' };
+    LANG = map[profileLang] || LANG;
+  }
+}
+function t(key, ...args) {
+  const tr = TRANSLATIONS[LANG] || TRANSLATIONS.en;
+  const val = tr[key] ?? TRANSLATIONS.ru[key] ?? key;
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+// ── API helper ────────────────────────────────────────────
+async function api(method, path, body=null) {
+  const headers = { 'Content-Type': 'application/json' };
+
+  // Auth: use initData (production) or dev header
+  if (INIT_DATA && INIT_DATA.length > 10) {
+    headers['X-Telegram-Init-Data'] = INIT_DATA;
+  } else if (TG_USER?.id) {
+    // DEV_MODE fallback — works when DEV_MODE=true on Railway
+    headers['X-Dev-User-Id'] = String(TG_USER.id);
+  }
+
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API_URL + path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(err.detail?.message || err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── State ─────────────────────────────────────────────────
+const S = {
+  profile:    null,
+  character:  null,
+  credits:    {},
+  view:       'chat',
+  loading:    false,
+  sheetKey:   null,
+  charGender: 'female',
+};
+
+// ── Character presets ─────────────────────────────────────
+const PRESETS = [
+  // female
+  { key:'redhead',   emoji:'🦊', gender:'female', nk:'preset_redhead_name',   dk:'preset_redhead_desc'   },
+  { key:'brunette',  emoji:'🖤', gender:'female', nk:'preset_brunette_name',  dk:'preset_brunette_desc'  },
+  { key:'blonde',    emoji:'✨', gender:'female', nk:'preset_blonde_name',    dk:'preset_blonde_desc'    },
+  { key:'furry',     emoji:'🐺', gender:'female', nk:'preset_furry_name',     dk:'preset_furry_desc'     },
+  // male
+  { key:'rebel',     emoji:'🤘', gender:'male',   nk:'preset_rebel_name',     dk:'preset_rebel_desc'     },
+  { key:'gentleman', emoji:'🎩', gender:'male',   nk:'preset_gentleman_name', dk:'preset_gentleman_desc' },
+  { key:'athlete',   emoji:'⚡', gender:'male',   nk:'preset_athlete_name',   dk:'preset_athlete_desc'   },
+  { key:'mystery_m', emoji:'🌑', gender:'male',   nk:'preset_mystery_m_name', dk:'preset_mystery_m_desc' },
+];
+
+// ── Translations ──────────────────────────────────────────
+const TRANSLATIONS = {
+  ru: {
+    status_online: 'всегда онлайн',
+    btn_gen_image: 'Генерировать образ',
+    btn_voice: 'Голосовое',
+    placeholder_chat: 'Напиши сообщение...',
+    btn_attach: 'Прикрепить фото',
+    btn_record: 'Удержи для записи',
+    placeholder_caption: 'Добавь подпись (необязательно)',
+    btn_send_image: 'Отправить',
+    suggestion1: 'Расскажи о себе',
+    suggestion2: 'Как твой день?',
+    suggestion3: 'Сделай комплимент',
+    suggestion4: 'Что думаешь обо мне?',
+    welcome_greeting: (name) => `Привет, ${name}!`,
+    welcome_sub: (name) => `Я ${name} — твой персональный AI-ассистент. О чём поговорим?`,
+    hero_default_name: 'Выбери персонажа',
+    hero_default_desc: 'Выбери образ ниже — он определит стиль общения, голос и генерацию изображений',
+    section_presets: 'Пресеты',
+    section_custom: 'Своя модель',
+    placeholder_custom: 'Опиши свою идеальную модель: внешность, характер, стиль, атмосфера...\n\nНапример: Стройная азиатка с длинными тёмными волосами, умная и загадочная, в стиле dark academia...',
+    btn_save_char: 'Сохранить образ',
+    custom_no_desc: 'Опиши свой образ ниже',
+    section_style: 'Стиль общения',
+    label_style: 'Стиль',
+    label_tone: 'Тон',
+    label_volume: 'Объём',
+    label_language: 'Язык',
+    section_more: 'Дополнительно',
+    label_notifications: 'Уведомления',
+    val_notifications: 'Каждые 12 часов',
+    label_clear_history: 'Очистить историю',
+    val_clear_history: 'Начать разговор заново',
+    section_instructions: 'Инструкции',
+    placeholder_instructions: 'Свои правила для ассистента. Например: Всегда отвечай по-русски. Обращайся ко мне на «ты»...',
+    btn_save: 'Сохранить',
+    credit_images: 'Изображений',
+    credit_voice: 'Голосовых',
+    credit_video: 'Видео',
+    section_ads: 'Реклама',
+    ad_image_label: '+2 кредита изображений',
+    ad_watch: 'Посмотреть рекламу',
+    ad_voice_label: '+2 кредита голосовых',
+    section_buy: 'Купить за Stars ⭐',
+    buy_10img: '10 изображений',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 голосовых',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Бандл: всё вместе',
+    buy_bundle_desc: '120 ⭐ · 10 изо + 15 голос + 3 видео',
+    btn_buy: 'Купить',
+    nav_chat: 'Чат',
+    nav_char: 'Персонаж',
+    nav_settings: 'Настройки',
+    nav_credits: 'Кредиты',
+    toast_char_selected: 'Персонаж выбран ✓',
+    toast_char_saved: 'Образ сохранён ✓',
+    toast_too_short: 'Описание слишком короткое',
+    toast_instructions_saved: 'Инструкции сохранены ✓',
+    toast_history_cleared: (n) => 'История очищена',
+    toast_no_char: 'Сначала выбери персонажа!',
+    toast_generating: '🎙 Генерирую голосовое...',
+    toast_gen_done: 'Образ сгенерирован ✓',
+    toast_voice_gen: '🎙 Голосовое готово',
+    toast_error: (msg) => 'Ошибка: ' + msg,
+    toast_vision_error: (msg) => '👁 Для анализа фото нужна модель gpt-4o. Настрой LLM_MODEL в Railway.',
+    toast_stt_error: (msg) => '🎙 STT не настроен. Добавь STT_PROVIDER=whisper и STT_API_KEY в Railway Variables.',
+    toast_no_credits: 'Нет кредитов для генерации',
+    sheet_style: '🎨 Стиль общения',
+    sheet_tone: '🎭 Тон',
+    sheet_verbosity: '📝 Объём ответов',
+    sheet_language: '🌍 Язык',
+    err_connection: 'Ошибка подключения',
+    gen_analyzing: '🎨 Анализирую контекст разговора...\nГенерирую образ персонажа...',
+    gen_stub: 'Изображение сгенерировано (stub)',
+    gen_no_credits: 'Нет кредитов для генерации',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Голосовое готово').substring(0, 40),
+    confirm_clear: 'Очистить историю?',
+    confirm_clear_msg: 'Разговор будет удалён. Это действие нельзя отменить.',
+    confirm_clear_ok: 'Очистить',
+    confirm_clear_cancel: 'Отмена',
+    custom_model_name: 'Своя модель',
+    saved_ok: 'Сохранено ✓',
+    notify_on: 'Уведомления включены',
+    notify_off: 'Уведомления отключены',
+    history_cleared: 'История очищена',
+    record_too_short: 'Запись слишком короткая — удержи дольше',
+    mic_denied: 'Нет доступа к микрофону',
+    img_only: 'Поддерживаются только изображения',
+    img_too_big: 'Изображение слишком большое (макс. 5 МБ)',
+    chat_error: '😔 Что-то пошло не так. Попробуй ещё раз.',
+    ad_loading: '📺 Засчитываю просмотр...',
+    ad_limit: 'Лимит исчерпан',
+    err_debug: 'Проверь консоль браузера (F12) для деталей.',
+    gender_female: 'Женский',
+    gender_male: 'Мужской',
+    d_casual: 'Расслабленный, как переписка с другом',
+    d_formal: 'Официальный, деловой',
+    d_friendly: 'Тёплый и дружелюбный',
+    d_playful: 'Игривый, с шутками',
+    d_flirty: 'Кокетливый, с флиртом',
+    d_intimate: 'Близкий, личный',
+    d_seductive: 'Чувственный, соблазнительный',
+    d_caring: 'Заботливый, нежный',
+    d_savage: 'Без фильтров, прямолинейный',
+    d_tone_friendly: 'Тёплый и поддерживающий',
+    d_tone_analytical: 'Логичный, структурированный',
+    d_tone_humorous: 'С юмором и остроумием',
+    d_tone_empathetic: 'Сочувствующий, понимающий',
+    d_tone_passionate: 'Страстный, экспрессивный',
+    d_tone_seductive: 'Соблазнительный',
+    d_tone_dominant: 'Уверенный, командный',
+    d_tone_submissive: 'Мягкий, следует за тобой',
+    d_tone_teasing: 'Дразнящий, провокационный',
+    d_tone_mysterious: 'Загадочный, интригующий',
+    d_tone_raw: 'Без фильтров',
+    d_short: '1–3 предложения, кратко',
+    d_normal: 'Полный ответ без лишнего',
+    d_detailed: 'Подробно, с примерами',
+    d_lang_auto: 'Отвечает на языке твоего сообщения',
+    preset_redhead_name: 'Раскрепощённая рыжая',   preset_redhead_desc: 'Дерзкая, огненная, свободолюбивая',
+    preset_brunette_name: 'Горячая брюнетка',        preset_brunette_desc: 'Страстная, загадочная',
+    preset_blonde_name: 'Сногшибательная блондинка', preset_blonde_desc: 'Яркая, лёгкая, энергичная',
+    preset_furry_name: 'Фурри волчица',              preset_furry_desc: 'Дикая, преданная, таинственная',
+    preset_rebel_name: 'Дерзкий бунтарь',            preset_rebel_desc: 'Независимый, харизматичный, без правил',
+    preset_gentleman_name: 'Утончённый джентльмен',  preset_gentleman_desc: 'Галантный, умный, обаятельный',
+    preset_athlete_name: 'Атлет-победитель',          preset_athlete_desc: 'Сильный, энергичный, целеустремлённый',
+    preset_mystery_m_name: 'Загадочный незнакомец',  preset_mystery_m_desc: 'Молчаливый, глубокий, притягательный',
+  },
+  en: {
+    status_online: 'always online',
+    btn_gen_image: 'Generate image',
+    btn_voice: 'Voice message',
+    placeholder_chat: 'Write a message...',
+    btn_attach: 'Attach photo',
+    btn_record: 'Hold to record',
+    placeholder_caption: 'Add a caption (optional)',
+    btn_send_image: 'Send',
+    suggestion1: 'Tell me about yourself',
+    suggestion2: 'How is your day?',
+    suggestion3: 'Give me a compliment',
+    suggestion4: 'What do you think of me?',
+    welcome_greeting: (name) => `Hey, ${name}!`,
+    welcome_sub: (name) => `I'm ${name} — your personal AI assistant. What shall we talk about?`,
+    hero_default_name: 'Choose a character',
+    hero_default_desc: 'Pick a character below — it will define the communication style, voice, and image generation',
+    section_presets: 'Presets',
+    section_custom: 'Custom model',
+    placeholder_custom: 'Describe your ideal model: appearance, personality, style, atmosphere...\n\nExample: Slim Asian girl with long dark hair, smart and mysterious, dark academia style...',
+    btn_save_char: 'Save character',
+    custom_no_desc: 'Describe your character below',
+    section_style: 'Communication style',
+    label_style: 'Style',
+    label_tone: 'Tone',
+    label_volume: 'Verbosity',
+    label_language: 'Language',
+    section_more: 'More',
+    label_notifications: 'Notifications',
+    val_notifications: 'Every 12 hours',
+    label_clear_history: 'Clear history',
+    val_clear_history: 'Start the conversation over',
+    section_instructions: 'Instructions',
+    placeholder_instructions: 'Custom rules for the assistant. E.g.: Always reply in English. Address me informally...',
+    btn_save: 'Save',
+    credit_images: 'Images',
+    credit_voice: 'Voice',
+    credit_video: 'Video',
+    section_ads: 'Watch ads',
+    ad_image_label: '+2 image credits',
+    ad_watch: 'Watch ad',
+    ad_voice_label: '+2 voice credits',
+    section_buy: 'Buy with Stars ⭐',
+    buy_10img: '10 images',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 voice messages',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Bundle: everything',
+    buy_bundle_desc: '120 ⭐ · 10 img + 15 voice + 3 video',
+    btn_buy: 'Buy',
+    nav_chat: 'Chat',
+    nav_char: 'Character',
+    nav_settings: 'Settings',
+    nav_credits: 'Credits',
+    toast_char_selected: 'Character selected ✓',
+    toast_char_saved: 'Character saved ✓',
+    toast_too_short: 'Description is too short',
+    toast_instructions_saved: 'Instructions saved ✓',
+    toast_history_cleared: (n) => 'History cleared',
+    toast_no_char: 'Choose a character first!',
+    toast_generating: '🎙 Generating voice...',
+    toast_gen_done: 'Image generated ✓',
+    toast_voice_gen: '🎙 Voice ready',
+    toast_error: (msg) => 'Error: ' + msg,
+    toast_vision_error: (msg) => '👁 To analyse photos you need the gpt-4o model. Configure LLM_MODEL in Railway.',
+    toast_stt_error: (msg) => '🎙 STT not configured. Add STT_PROVIDER=whisper and STT_API_KEY in Railway Variables.',
+    toast_no_credits: 'Not enough credits',
+    sheet_style: '🎨 Communication style',
+    sheet_tone: '🎭 Tone',
+    sheet_verbosity: '📝 Response length',
+    sheet_language: '🌍 Language',
+    err_connection: 'Connection error',
+    gen_analyzing: '🎨 Analysing conversation context...\nGenerating character image...',
+    gen_stub: 'Image generated (stub)',
+    gen_no_credits: 'Not enough credits to generate',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Voice ready').substring(0, 40),
+    confirm_clear: 'Clear history?',
+    confirm_clear_msg: 'The conversation will be deleted. This cannot be undone.',
+    confirm_clear_ok: 'Clear',
+    confirm_clear_cancel: 'Cancel',
+    custom_model_name: 'Custom model',
+    saved_ok: 'Saved ✓',
+    notify_on: 'Notifications enabled',
+    notify_off: 'Notifications disabled',
+    history_cleared: 'History cleared',
+    record_too_short: 'Recording too short — hold longer',
+    mic_denied: 'Microphone access denied',
+    img_only: 'Only images are supported',
+    img_too_big: 'Image is too large (max 5 MB)',
+    chat_error: '😔 Something went wrong. Please try again.',
+    ad_loading: '📺 Processing ad view...',
+    ad_limit: 'Limit reached',
+    err_debug: 'Check the browser console (F12) for details.',
+    gender_female: 'Female',
+    gender_male: 'Male',
+    d_casual: 'Relaxed, like texting a friend',
+    d_formal: 'Official, professional',
+    d_friendly: 'Warm and friendly',
+    d_playful: 'Playful, with jokes',
+    d_flirty: 'Flirtatious, teasing',
+    d_intimate: 'Close, personal',
+    d_seductive: 'Sensual, seductive',
+    d_caring: 'Caring, tender',
+    d_savage: 'No filter, straightforward',
+    d_tone_friendly: 'Warm and supportive',
+    d_tone_analytical: 'Logical, structured',
+    d_tone_humorous: 'With humor and wit',
+    d_tone_empathetic: 'Compassionate, understanding',
+    d_tone_passionate: 'Passionate, expressive',
+    d_tone_seductive: 'Seductive',
+    d_tone_dominant: 'Confident, commanding',
+    d_tone_submissive: 'Soft, follows your lead',
+    d_tone_teasing: 'Teasing, provocative',
+    d_tone_mysterious: 'Mysterious, intriguing',
+    d_tone_raw: 'No filter',
+    d_short: '1–3 sentences, brief',
+    d_normal: 'Full answer, no fluff',
+    d_detailed: 'Detailed, with examples',
+    d_lang_auto: 'Replies in the language of your message',
+    preset_redhead_name: 'Wild Redhead',           preset_redhead_desc: 'Bold, fiery, free-spirited',
+    preset_brunette_name: 'Hot Brunette',           preset_brunette_desc: 'Passionate, mysterious',
+    preset_blonde_name: 'Stunning Blonde',          preset_blonde_desc: 'Bright, easy-going, energetic',
+    preset_furry_name: 'Furry Wolf Girl',            preset_furry_desc: 'Wild, loyal, mysterious',
+    preset_rebel_name: 'Bold Rebel',                preset_rebel_desc: 'Independent, charismatic, rule-breaker',
+    preset_gentleman_name: 'Refined Gentleman',     preset_gentleman_desc: 'Gallant, smart, charming',
+    preset_athlete_name: 'Champion Athlete',         preset_athlete_desc: 'Strong, energetic, driven',
+    preset_mystery_m_name: 'Mysterious Stranger',   preset_mystery_m_desc: 'Silent, deep, magnetic',
+  },
+  de: {
+    status_online: 'immer online',
+    btn_gen_image: 'Bild generieren',
+    btn_voice: 'Sprachnachricht',
+    placeholder_chat: 'Schreib eine Nachricht...',
+    btn_attach: 'Foto anhängen',
+    btn_record: 'Halten zum Aufnehmen',
+    placeholder_caption: 'Bildunterschrift hinzufügen (optional)',
+    btn_send_image: 'Senden',
+    suggestion1: 'Erzähl mir von dir',
+    suggestion2: 'Wie war dein Tag?',
+    suggestion3: 'Mach mir ein Kompliment',
+    suggestion4: 'Was denkst du über mich?',
+    welcome_greeting: (name) => `Hallo, ${name}!`,
+    welcome_sub: (name) => `Ich bin ${name} — dein persönlicher KI-Assistent. Worüber möchtest du reden?`,
+    hero_default_name: 'Charakter wählen',
+    hero_default_desc: 'Wähle unten einen Charakter — er bestimmt den Kommunikationsstil, die Stimme und die Bildgenerierung',
+    section_presets: 'Voreinstellungen',
+    section_custom: 'Eigenes Modell',
+    placeholder_custom: 'Beschreibe dein ideales Modell: Aussehen, Persönlichkeit, Stil, Atmosphäre...',
+    btn_save_char: 'Charakter speichern',
+    custom_no_desc: 'Beschreibe deinen Charakter unten',
+    section_style: 'Kommunikationsstil',
+    label_style: 'Stil',
+    label_tone: 'Ton',
+    label_volume: 'Ausführlichkeit',
+    label_language: 'Sprache',
+    section_more: 'Mehr',
+    label_notifications: 'Benachrichtigungen',
+    val_notifications: 'Alle 12 Stunden',
+    label_clear_history: 'Verlauf löschen',
+    val_clear_history: 'Gespräch neu beginnen',
+    section_instructions: 'Anweisungen',
+    placeholder_instructions: 'Eigene Regeln für den Assistenten. Z. B.: Antworte immer auf Deutsch...',
+    btn_save: 'Speichern',
+    credit_images: 'Bilder',
+    credit_voice: 'Sprache',
+    credit_video: 'Video',
+    section_ads: 'Werbung ansehen',
+    ad_image_label: '+2 Bild-Credits',
+    ad_watch: 'Werbung ansehen',
+    ad_voice_label: '+2 Sprach-Credits',
+    section_buy: 'Mit Stars kaufen ⭐',
+    buy_10img: '10 Bilder',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 Sprachnachrichten',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Bundle: alles zusammen',
+    buy_bundle_desc: '120 ⭐ · 10 Bild + 15 Sprache + 3 Video',
+    btn_buy: 'Kaufen',
+    nav_chat: 'Chat',
+    nav_char: 'Charakter',
+    nav_settings: 'Einstellungen',
+    nav_credits: 'Credits',
+    toast_char_selected: 'Charakter ausgewählt ✓',
+    toast_char_saved: 'Charakter gespeichert ✓',
+    toast_too_short: 'Beschreibung zu kurz',
+    toast_instructions_saved: 'Anweisungen gespeichert ✓',
+    toast_history_cleared: (n) => 'Verlauf gelöscht',
+    toast_no_char: 'Wähle zuerst einen Charakter!',
+    toast_generating: '🎙 Sprachnachricht wird generiert...',
+    toast_gen_done: 'Bild generiert ✓',
+    toast_voice_gen: '🎙 Sprache bereit',
+    toast_error: (msg) => 'Fehler: ' + msg,
+    toast_vision_error: (msg) => '👁 Für die Bildanalyse wird das gpt-4o-Modell benötigt. LLM_MODEL in Railway konfigurieren.',
+    toast_stt_error: (msg) => '🎙 STT nicht konfiguriert. Füge STT_PROVIDER=whisper und STT_API_KEY in Railway hinzu.',
+    toast_no_credits: 'Nicht genug Credits',
+    sheet_style: '🎨 Kommunikationsstil',
+    sheet_tone: '🎭 Ton',
+    sheet_verbosity: '📝 Antwortlänge',
+    sheet_language: '🌍 Sprache',
+    err_connection: 'Verbindungsfehler',
+    gen_analyzing: '🎨 Gesprächskontext analysieren...\nCharakterbild generieren...',
+    gen_stub: 'Bild generiert (Platzhalter)',
+    gen_no_credits: 'Nicht genug Credits',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Sprache bereit').substring(0, 40),
+    confirm_clear: 'Verlauf löschen?',
+    confirm_clear_msg: 'Das Gespräch wird gelöscht. Dies kann nicht rückgängig gemacht werden.',
+    confirm_clear_ok: 'Löschen',
+    confirm_clear_cancel: 'Abbrechen',
+    custom_model_name: 'Eigenes Modell',
+    saved_ok: 'Gespeichert ✓',
+    notify_on: 'Benachrichtigungen aktiviert',
+    notify_off: 'Benachrichtigungen deaktiviert',
+    history_cleared: 'Verlauf gelöscht',
+    record_too_short: 'Aufnahme zu kurz — länger halten',
+    mic_denied: 'Mikrofonzugriff verweigert',
+    img_only: 'Nur Bilder werden unterstützt',
+    img_too_big: 'Bild zu groß (max 5 MB)',
+    chat_error: '😔 Etwas ist schiefgelaufen. Bitte versuche es erneut.',
+    ad_loading: '📺 Werbeanzeige wird verarbeitet...',
+    ad_limit: 'Limit erreicht',
+    err_debug: 'Überprüfe die Browser-Konsole (F12) für Details.',
+    gender_female: 'Weiblich',
+    gender_male: 'Männlich',
+    d_casual: 'Entspannt, wie ein Chat mit einem Freund',
+    d_formal: 'Offiziell, sachlich',
+    d_friendly: 'Warm und freundlich',
+    d_playful: 'Verspielt, mit Witzen',
+    d_flirty: 'Flirtend, kokett',
+    d_intimate: 'Nah, persönlich',
+    d_seductive: 'Sinnlich, verführerisch',
+    d_caring: 'Fürsorglich, zärtlich',
+    d_savage: 'Ohne Filter, direkt',
+    d_tone_friendly: 'Warm und unterstützend',
+    d_tone_analytical: 'Logisch, strukturiert',
+    d_tone_humorous: 'Mit Humor und Witz',
+    d_tone_empathetic: 'Mitfühlend, verständnisvoll',
+    d_tone_passionate: 'Leidenschaftlich, ausdrucksstark',
+    d_tone_seductive: 'Verführerisch',
+    d_tone_dominant: 'Selbstbewusst, bestimmt',
+    d_tone_submissive: 'Sanft, folgt deiner Führung',
+    d_tone_teasing: 'Neckend, provokativ',
+    d_tone_mysterious: 'Geheimnisvoll, fesselnd',
+    d_tone_raw: 'Ohne Filter',
+    d_short: '1–3 Sätze, kurz',
+    d_normal: 'Vollständige Antwort, ohne Überflüssiges',
+    d_detailed: 'Ausführlich, mit Beispielen',
+    d_lang_auto: 'Antwortet in der Sprache deiner Nachricht',
+    preset_redhead_name: 'Wilde Rothaarige',           preset_redhead_desc: 'Kühn, feurig, freiheitsliebend',
+    preset_brunette_name: 'Heiße Brünette',             preset_brunette_desc: 'Leidenschaftlich, geheimnisvoll',
+    preset_blonde_name: 'Atemberaubende Blondine',      preset_blonde_desc: 'Strahlend, locker, energetisch',
+    preset_furry_name: 'Furry Wölfin',                  preset_furry_desc: 'Wild, treu, geheimnisvoll',
+    preset_rebel_name: 'Kühner Rebell',                 preset_rebel_desc: 'Unabhängig, charismatisch, regellos',
+    preset_gentleman_name: 'Kultivierter Gentleman',    preset_gentleman_desc: 'Galant, klug, charmant',
+    preset_athlete_name: 'Champion-Athlet',              preset_athlete_desc: 'Stark, energetisch, zielstrebig',
+    preset_mystery_m_name: 'Geheimnisvoller Fremder',  preset_mystery_m_desc: 'Schweigsam, tiefgründig, anziehend',
+  },
+  fr: {
+    status_online: 'toujours en ligne',
+    btn_gen_image: 'Générer une image',
+    btn_voice: 'Message vocal',
+    placeholder_chat: 'Écris un message...',
+    btn_attach: 'Joindre une photo',
+    btn_record: 'Maintenir pour enregistrer',
+    placeholder_caption: 'Ajouter une légende (facultatif)',
+    btn_send_image: 'Envoyer',
+    suggestion1: 'Parle-moi de toi',
+    suggestion2: 'Comment se passe ta journée ?',
+    suggestion3: 'Fais-moi un compliment',
+    suggestion4: 'Que penses-tu de moi ?',
+    welcome_greeting: (name) => `Salut, ${name} !`,
+    welcome_sub: (name) => `Je suis ${name} — ton assistant IA personnel. De quoi veux-tu parler ?`,
+    hero_default_name: 'Choisir un personnage',
+    hero_default_desc: 'Choisis un personnage ci-dessous — il définira le style de communication, la voix et la génération d\'images',
+    section_presets: 'Préréglages',
+    section_custom: 'Modèle personnalisé',
+    placeholder_custom: 'Décris ton modèle idéal : apparence, personnalité, style, atmosphère...',
+    btn_save_char: 'Sauvegarder le personnage',
+    custom_no_desc: 'Décris ton personnage ci-dessous',
+    section_style: 'Style de communication',
+    label_style: 'Style',
+    label_tone: 'Ton',
+    label_volume: 'Verbosité',
+    label_language: 'Langue',
+    section_more: 'Plus',
+    label_notifications: 'Notifications',
+    val_notifications: 'Toutes les 12 heures',
+    label_clear_history: 'Effacer l\'historique',
+    val_clear_history: 'Recommencer la conversation',
+    section_instructions: 'Instructions',
+    placeholder_instructions: 'Règles personnalisées pour l\'assistant. Par ex. : Réponds toujours en français...',
+    btn_save: 'Sauvegarder',
+    credit_images: 'Images',
+    credit_voice: 'Vocaux',
+    credit_video: 'Vidéo',
+    section_ads: 'Regarder des publicités',
+    ad_image_label: '+2 crédits images',
+    ad_watch: 'Regarder la pub',
+    ad_voice_label: '+2 crédits vocaux',
+    section_buy: 'Acheter avec des Stars ⭐',
+    buy_10img: '10 images',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 messages vocaux',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Bundle : tout inclus',
+    buy_bundle_desc: '120 ⭐ · 10 img + 15 vocal + 3 vidéo',
+    btn_buy: 'Acheter',
+    nav_chat: 'Chat',
+    nav_char: 'Personnage',
+    nav_settings: 'Paramètres',
+    nav_credits: 'Crédits',
+    toast_char_selected: 'Personnage sélectionné ✓',
+    toast_char_saved: 'Personnage sauvegardé ✓',
+    toast_too_short: 'Description trop courte',
+    toast_instructions_saved: 'Instructions sauvegardées ✓',
+    toast_history_cleared: (n) => 'Historique effacé',
+    toast_no_char: 'Choisis d\'abord un personnage !',
+    toast_generating: '🎙 Génération du vocal...',
+    toast_gen_done: 'Image générée ✓',
+    toast_voice_gen: '🎙 Vocal prêt',
+    toast_error: (msg) => 'Erreur : ' + msg,
+    toast_vision_error: (msg) => '👁 Pour analyser des photos, le modèle gpt-4o est requis. Configure LLM_MODEL dans Railway.',
+    toast_stt_error: (msg) => '🎙 STT non configuré. Ajoute STT_PROVIDER=whisper et STT_API_KEY dans Railway.',
+    toast_no_credits: 'Crédits insuffisants',
+    sheet_style: '🎨 Style de communication',
+    sheet_tone: '🎭 Ton',
+    sheet_verbosity: '📝 Longueur des réponses',
+    sheet_language: '🌍 Langue',
+    err_connection: 'Erreur de connexion',
+    gen_analyzing: '🎨 Analyse du contexte...\nGénération de l\'image du personnage...',
+    gen_stub: 'Image générée (ébauche)',
+    gen_no_credits: 'Crédits insuffisants',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Vocal prêt').substring(0, 40),
+    confirm_clear: 'Effacer l\'historique ?',
+    confirm_clear_msg: 'La conversation sera supprimée. Cette action est irréversible.',
+    confirm_clear_ok: 'Effacer',
+    confirm_clear_cancel: 'Annuler',
+    custom_model_name: 'Modèle personnalisé',
+    saved_ok: 'Sauvegardé ✓',
+    notify_on: 'Notifications activées',
+    notify_off: 'Notifications désactivées',
+    history_cleared: 'Historique effacé',
+    record_too_short: 'Enregistrement trop court — maintiens plus longtemps',
+    mic_denied: 'Accès au microphone refusé',
+    img_only: 'Seules les images sont prises en charge',
+    img_too_big: 'Image trop grande (max 5 Mo)',
+    chat_error: '😔 Quelque chose s\'est mal passé. Réessaie.',
+    ad_loading: '📺 Traitement de la publicité...',
+    ad_limit: 'Limite atteinte',
+    err_debug: 'Consulte la console du navigateur (F12) pour les détails.',
+    gender_female: 'Féminin',
+    gender_male: 'Masculin',
+    d_casual: 'Détendu, comme un chat entre amis',
+    d_formal: 'Officiel, professionnel',
+    d_friendly: 'Chaleureux et amical',
+    d_playful: 'Enjoué, avec des blagues',
+    d_flirty: 'Flirteur, taquin',
+    d_intimate: 'Proche, personnel',
+    d_seductive: 'Sensuel, séduisant',
+    d_caring: 'Attentionné, tendre',
+    d_savage: 'Sans filtre, direct',
+    d_tone_friendly: 'Chaleureux et bienveillant',
+    d_tone_analytical: 'Logique, structuré',
+    d_tone_humorous: 'Avec humour et esprit',
+    d_tone_empathetic: 'Empathique, compréhensif',
+    d_tone_passionate: 'Passionné, expressif',
+    d_tone_seductive: 'Séducteur',
+    d_tone_dominant: 'Confiant, autoritaire',
+    d_tone_submissive: 'Doux, suit ton rythme',
+    d_tone_teasing: 'Taquin, provocateur',
+    d_tone_mysterious: 'Mystérieux, intrigant',
+    d_tone_raw: 'Sans filtre',
+    d_short: '1–3 phrases, bref',
+    d_normal: 'Réponse complète, sans superflu',
+    d_detailed: 'Détaillé, avec des exemples',
+    d_lang_auto: 'Répond dans la langue de ton message',
+    preset_redhead_name: 'Rousse Sauvage',             preset_redhead_desc: 'Audacieuse, ardente, libre',
+    preset_brunette_name: 'Brune Brûlante',             preset_brunette_desc: 'Passionnée, mystérieuse',
+    preset_blonde_name: 'Blonde Époustouflante',        preset_blonde_desc: 'Lumineuse, légère, énergique',
+    preset_furry_name: 'Furry Louve',                   preset_furry_desc: 'Sauvage, loyale, mystérieuse',
+    preset_rebel_name: 'Rebelle Audacieux',             preset_rebel_desc: 'Indépendant, charismatique, sans règles',
+    preset_gentleman_name: 'Gentleman Raffiné',         preset_gentleman_desc: 'Galant, intelligent, charmant',
+    preset_athlete_name: 'Athlète Champion',             preset_athlete_desc: 'Fort, énergique, déterminé',
+    preset_mystery_m_name: 'Étranger Mystérieux',       preset_mystery_m_desc: 'Silencieux, profond, magnétique',
+  },
+  pl: {
+    status_online: 'zawsze online',
+    btn_gen_image: 'Generuj obraz',
+    btn_voice: 'Wiadomość głosowa',
+    placeholder_chat: 'Napisz wiadomość...',
+    btn_attach: 'Dołącz zdjęcie',
+    btn_record: 'Przytrzymaj, aby nagrać',
+    placeholder_caption: 'Dodaj podpis (opcjonalnie)',
+    btn_send_image: 'Wyślij',
+    suggestion1: 'Opowiedz mi o sobie',
+    suggestion2: 'Jak mija ci dzień?',
+    suggestion3: 'Powiedz mi komplement',
+    suggestion4: 'Co o mnie myślisz?',
+    welcome_greeting: (name) => `Cześć, ${name}!`,
+    welcome_sub: (name) => `Jestem ${name} — twój osobisty asystent AI. O czym porozmawiamy?`,
+    hero_default_name: 'Wybierz postać',
+    hero_default_desc: 'Wybierz postać poniżej — określi styl komunikacji, głos i generowanie obrazów',
+    section_presets: 'Presety',
+    section_custom: 'Własny model',
+    placeholder_custom: 'Opisz swój idealny model: wygląd, osobowość, styl, atmosfera...',
+    btn_save_char: 'Zapisz postać',
+    custom_no_desc: 'Opisz swoją postać poniżej',
+    section_style: 'Styl komunikacji',
+    label_style: 'Styl',
+    label_tone: 'Ton',
+    label_volume: 'Szczegółowość',
+    label_language: 'Język',
+    section_more: 'Więcej',
+    label_notifications: 'Powiadomienia',
+    val_notifications: 'Co 12 godzin',
+    label_clear_history: 'Wyczyść historię',
+    val_clear_history: 'Zacznij rozmowę od nowa',
+    section_instructions: 'Instrukcje',
+    placeholder_instructions: 'Własne zasady dla asystenta. Np.: Zawsze odpowiadaj po polsku...',
+    btn_save: 'Zapisz',
+    credit_images: 'Obrazy',
+    credit_voice: 'Głosowe',
+    credit_video: 'Wideo',
+    section_ads: 'Oglądaj reklamy',
+    ad_image_label: '+2 kredyty obrazów',
+    ad_watch: 'Obejrzyj reklamę',
+    ad_voice_label: '+2 kredyty głosowe',
+    section_buy: 'Kup za Stars ⭐',
+    buy_10img: '10 obrazów',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 wiadomości głosowych',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Pakiet: wszystko razem',
+    buy_bundle_desc: '120 ⭐ · 10 obr + 15 głos + 3 wideo',
+    btn_buy: 'Kup',
+    nav_chat: 'Chat',
+    nav_char: 'Postać',
+    nav_settings: 'Ustawienia',
+    nav_credits: 'Kredyty',
+    toast_char_selected: 'Postać wybrana ✓',
+    toast_char_saved: 'Postać zapisana ✓',
+    toast_too_short: 'Opis jest za krótki',
+    toast_instructions_saved: 'Instrukcje zapisane ✓',
+    toast_history_cleared: (n) => 'Historia wyczyszczona',
+    toast_no_char: 'Najpierw wybierz postać!',
+    toast_generating: '🎙 Generuję wiadomość głosową...',
+    toast_gen_done: 'Obraz wygenerowany ✓',
+    toast_voice_gen: '🎙 Głosowe gotowe',
+    toast_error: (msg) => 'Błąd: ' + msg,
+    toast_vision_error: (msg) => '👁 Do analizy zdjęć potrzebny jest model gpt-4o. Skonfiguruj LLM_MODEL w Railway.',
+    toast_stt_error: (msg) => '🎙 STT nie jest skonfigurowany. Dodaj STT_PROVIDER=whisper i STT_API_KEY w Railway.',
+    toast_no_credits: 'Niewystarczające kredyty',
+    sheet_style: '🎨 Styl komunikacji',
+    sheet_tone: '🎭 Ton',
+    sheet_verbosity: '📝 Długość odpowiedzi',
+    sheet_language: '🌍 Język',
+    err_connection: 'Błąd połączenia',
+    gen_analyzing: '🎨 Analizuję kontekst rozmowy...\nGeneruję obraz postaci...',
+    gen_stub: 'Obraz wygenerowany (placeholder)',
+    gen_no_credits: 'Niewystarczające kredyty',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Głosowe gotowe').substring(0, 40),
+    confirm_clear: 'Wyczyścić historię?',
+    confirm_clear_msg: 'Rozmowa zostanie usunięta. Tej czynności nie można cofnąć.',
+    confirm_clear_ok: 'Wyczyść',
+    confirm_clear_cancel: 'Anuluj',
+    custom_model_name: 'Własny model',
+    saved_ok: 'Zapisano ✓',
+    notify_on: 'Powiadomienia włączone',
+    notify_off: 'Powiadomienia wyłączone',
+    history_cleared: 'Historia wyczyszczona',
+    record_too_short: 'Nagranie za krótkie — przytrzymaj dłużej',
+    mic_denied: 'Odmowa dostępu do mikrofonu',
+    img_only: 'Obsługiwane są tylko obrazy',
+    img_too_big: 'Obraz za duży (maks. 5 MB)',
+    chat_error: '😔 Coś poszło nie tak. Spróbuj ponownie.',
+    ad_loading: '📺 Przetwarzanie reklamy...',
+    ad_limit: 'Limit osiągnięty',
+    err_debug: 'Sprawdź konsolę przeglądarki (F12), aby uzyskać szczegóły.',
+    gender_female: 'Żeński',
+    gender_male: 'Męski',
+    d_casual: 'Swobodny, jak rozmowa z przyjacielem',
+    d_formal: 'Oficjalny, służbowy',
+    d_friendly: 'Ciepły i przyjazny',
+    d_playful: 'Rozbawiony, z żartami',
+    d_flirty: 'Flirciarski, kokieteryjny',
+    d_intimate: 'Bliski, osobisty',
+    d_seductive: 'Zmysłowy, uwodzicielski',
+    d_caring: 'Troskliwy, czuły',
+    d_savage: 'Bez filtrów, bezpośredni',
+    d_tone_friendly: 'Ciepły i wspierający',
+    d_tone_analytical: 'Logiczny, strukturyzowany',
+    d_tone_humorous: 'Z humorem i dowcipem',
+    d_tone_empathetic: 'Empatyczny, rozumiejący',
+    d_tone_passionate: 'Namiętny, ekspresyjny',
+    d_tone_seductive: 'Uwodzicielski',
+    d_tone_dominant: 'Pewny siebie, władczy',
+    d_tone_submissive: 'Łagodny, podąża za tobą',
+    d_tone_teasing: 'Drażniący, prowokacyjny',
+    d_tone_mysterious: 'Tajemniczy, intrygujący',
+    d_tone_raw: 'Bez filtrów',
+    d_short: '1–3 zdania, krótko',
+    d_normal: 'Pełna odpowiedź bez zbędnych słów',
+    d_detailed: 'Szczegółowo, z przykładami',
+    d_lang_auto: 'Odpowiada w języku twojej wiadomości',
+    preset_redhead_name: 'Dzika Ruda',                  preset_redhead_desc: 'Śmiała, ognista, wolnościowa',
+    preset_brunette_name: 'Gorąca Brunetka',             preset_brunette_desc: 'Namiętna, tajemnicza',
+    preset_blonde_name: 'Olśniewająca Blondynka',       preset_blonde_desc: 'Energiczna, bezpośrednia, żywiołowa',
+    preset_furry_name: 'Furry Wilczyca',                 preset_furry_desc: 'Dzika, wierna, tajemnicza',
+    preset_rebel_name: 'Śmiały Buntownik',              preset_rebel_desc: 'Niezależny, charyzmatyczny, bez reguł',
+    preset_gentleman_name: 'Wykwintny Dżentelmen',      preset_gentleman_desc: 'Galant, mądry, czarujący',
+    preset_athlete_name: 'Atleta Zwycięzca',             preset_athlete_desc: 'Silny, energiczny, zdeterminowany',
+    preset_mystery_m_name: 'Tajemniczy Nieznajomy',     preset_mystery_m_desc: 'Milczący, głęboki, magnetyczny',
+  },
+  es: {
+    status_online: 'siempre en línea',
+    btn_gen_image: 'Generar imagen',
+    btn_voice: 'Mensaje de voz',
+    placeholder_chat: 'Escribe un mensaje...',
+    btn_attach: 'Adjuntar foto',
+    btn_record: 'Mantén para grabar',
+    placeholder_caption: 'Añade un pie de foto (opcional)',
+    btn_send_image: 'Enviar',
+    suggestion1: 'Cuéntame sobre ti',
+    suggestion2: '¿Cómo va tu día?',
+    suggestion3: 'Hazme un cumplido',
+    suggestion4: '¿Qué piensas de mí?',
+    welcome_greeting: (name) => `¡Hola, ${name}!`,
+    welcome_sub: (name) => `Soy ${name} — tu asistente de IA personal. ¿De qué quieres hablar?`,
+    hero_default_name: 'Elige un personaje',
+    hero_default_desc: 'Elige un personaje a continuación — definirá el estilo de comunicación, la voz y la generación de imágenes',
+    section_presets: 'Preajustes',
+    section_custom: 'Modelo personalizado',
+    placeholder_custom: 'Describe tu modelo ideal: apariencia, personalidad, estilo, atmósfera...',
+    btn_save_char: 'Guardar personaje',
+    custom_no_desc: 'Describe tu personaje abajo',
+    section_style: 'Estilo de comunicación',
+    label_style: 'Estilo',
+    label_tone: 'Tono',
+    label_volume: 'Verbosidad',
+    label_language: 'Idioma',
+    section_more: 'Más',
+    label_notifications: 'Notificaciones',
+    val_notifications: 'Cada 12 horas',
+    label_clear_history: 'Borrar historial',
+    val_clear_history: 'Comenzar la conversación de nuevo',
+    section_instructions: 'Instrucciones',
+    placeholder_instructions: 'Reglas personalizadas para el asistente. Ej.: Responde siempre en español...',
+    btn_save: 'Guardar',
+    credit_images: 'Imágenes',
+    credit_voice: 'Voz',
+    credit_video: 'Vídeo',
+    section_ads: 'Ver anuncios',
+    ad_image_label: '+2 créditos de imágenes',
+    ad_watch: 'Ver anuncio',
+    ad_voice_label: '+2 créditos de voz',
+    section_buy: 'Comprar con Stars ⭐',
+    buy_10img: '10 imágenes',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 mensajes de voz',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Paquete: todo incluido',
+    buy_bundle_desc: '120 ⭐ · 10 img + 15 voz + 3 vídeo',
+    btn_buy: 'Comprar',
+    nav_chat: 'Chat',
+    nav_char: 'Personaje',
+    nav_settings: 'Ajustes',
+    nav_credits: 'Créditos',
+    toast_char_selected: 'Personaje seleccionado ✓',
+    toast_char_saved: 'Personaje guardado ✓',
+    toast_too_short: 'La descripción es demasiado corta',
+    toast_instructions_saved: 'Instrucciones guardadas ✓',
+    toast_history_cleared: (n) => 'Historial borrado',
+    toast_no_char: '¡Elige primero un personaje!',
+    toast_generating: '🎙 Generando mensaje de voz...',
+    toast_gen_done: 'Imagen generada ✓',
+    toast_voice_gen: '🎙 Voz lista',
+    toast_error: (msg) => 'Error: ' + msg,
+    toast_vision_error: (msg) => '👁 Para analizar fotos se necesita el modelo gpt-4o. Configura LLM_MODEL en Railway.',
+    toast_stt_error: (msg) => '🎙 STT no configurado. Añade STT_PROVIDER=whisper y STT_API_KEY en Railway.',
+    toast_no_credits: 'Créditos insuficientes',
+    sheet_style: '🎨 Estilo de comunicación',
+    sheet_tone: '🎭 Tono',
+    sheet_verbosity: '📝 Longitud de respuesta',
+    sheet_language: '🌍 Idioma',
+    err_connection: 'Error de conexión',
+    gen_analyzing: '🎨 Analizando contexto de la conversación...\nGenerando imagen del personaje...',
+    gen_stub: 'Imagen generada (borrador)',
+    gen_no_credits: 'Créditos insuficientes',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Voz lista').substring(0, 40),
+    confirm_clear: '¿Borrar historial?',
+    confirm_clear_msg: 'La conversación se eliminará. Esta acción no se puede deshacer.',
+    confirm_clear_ok: 'Borrar',
+    confirm_clear_cancel: 'Cancelar',
+    custom_model_name: 'Modelo personalizado',
+    saved_ok: 'Guardado ✓',
+    notify_on: 'Notificaciones activadas',
+    notify_off: 'Notificaciones desactivadas',
+    history_cleared: 'Historial borrado',
+    record_too_short: 'Grabación demasiado corta — mantén más tiempo',
+    mic_denied: 'Acceso al micrófono denegado',
+    img_only: 'Solo se admiten imágenes',
+    img_too_big: 'Imagen demasiado grande (máx. 5 MB)',
+    chat_error: '😔 Algo salió mal. Inténtalo de nuevo.',
+    ad_loading: '📺 Procesando anuncio...',
+    ad_limit: 'Límite alcanzado',
+    err_debug: 'Revisa la consola del navegador (F12) para más detalles.',
+    gender_female: 'Femenino',
+    gender_male: 'Masculino',
+    d_casual: 'Relajado, como un chat con un amigo',
+    d_formal: 'Oficial, profesional',
+    d_friendly: 'Cálido y amigable',
+    d_playful: 'Juguetón, con bromas',
+    d_flirty: 'Coqueto, seductor',
+    d_intimate: 'Cercano, personal',
+    d_seductive: 'Sensual, seductor',
+    d_caring: 'Cariñoso, tierno',
+    d_savage: 'Sin filtros, directo',
+    d_tone_friendly: 'Cálido y solidario',
+    d_tone_analytical: 'Lógico, estructurado',
+    d_tone_humorous: 'Con humor e ingenio',
+    d_tone_empathetic: 'Empático, comprensivo',
+    d_tone_passionate: 'Apasionado, expresivo',
+    d_tone_seductive: 'Seductor',
+    d_tone_dominant: 'Seguro, dominante',
+    d_tone_submissive: 'Suave, sigue tu ritmo',
+    d_tone_teasing: 'Provocador, burlón',
+    d_tone_mysterious: 'Misterioso, intrigante',
+    d_tone_raw: 'Sin filtros',
+    d_short: '1–3 frases, breve',
+    d_normal: 'Respuesta completa, sin relleno',
+    d_detailed: 'Detallado, con ejemplos',
+    d_lang_auto: 'Responde en el idioma de tu mensaje',
+    preset_redhead_name: 'Pelirroja Salvaje',            preset_redhead_desc: 'Atrevida, ardiente, libre',
+    preset_brunette_name: 'Morena Ardiente',              preset_brunette_desc: 'Apasionada, misteriosa',
+    preset_blonde_name: 'Rubia Deslumbrante',             preset_blonde_desc: 'Brillante, ligera, enérgica',
+    preset_furry_name: 'Furry Loba',                      preset_furry_desc: 'Salvaje, leal, misteriosa',
+    preset_rebel_name: 'Rebelde Audaz',                  preset_rebel_desc: 'Independiente, carismático, sin reglas',
+    preset_gentleman_name: 'Caballero Refinado',         preset_gentleman_desc: 'Galante, inteligente, encantador',
+    preset_athlete_name: 'Atleta Campeón',                preset_athlete_desc: 'Fuerte, enérgico, decidido',
+    preset_mystery_m_name: 'Desconocido Misterioso',     preset_mystery_m_desc: 'Silencioso, profundo, magnético',
+  },
+  pt: {
+    status_online: 'sempre online',
+    btn_gen_image: 'Gerar imagem',
+    btn_voice: 'Mensagem de voz',
+    placeholder_chat: 'Escreve uma mensagem...',
+    btn_attach: 'Anexar foto',
+    btn_record: 'Segura para gravar',
+    placeholder_caption: 'Adicionar legenda (opcional)',
+    btn_send_image: 'Enviar',
+    suggestion1: 'Fala-me sobre ti',
+    suggestion2: 'Como está o teu dia?',
+    suggestion3: 'Faz-me um elogio',
+    suggestion4: 'O que pensas de mim?',
+    welcome_greeting: (name) => `Olá, ${name}!`,
+    welcome_sub: (name) => `Sou ${name} — o teu assistente IA pessoal. Sobre o que vamos falar?`,
+    hero_default_name: 'Escolhe um personagem',
+    hero_default_desc: 'Escolhe um personagem abaixo — ele vai definir o estilo de comunicação, voz e geração de imagens',
+    section_presets: 'Predefinições',
+    section_custom: 'Modelo personalizado',
+    placeholder_custom: 'Descreve o teu modelo ideal: aparência, personalidade, estilo, atmosfera...',
+    btn_save_char: 'Guardar personagem',
+    custom_no_desc: 'Descreve o teu personagem abaixo',
+    section_style: 'Estilo de comunicação',
+    label_style: 'Estilo',
+    label_tone: 'Tom',
+    label_volume: 'Verbosidade',
+    label_language: 'Idioma',
+    section_more: 'Mais',
+    label_notifications: 'Notificações',
+    val_notifications: 'De 12 em 12 horas',
+    label_clear_history: 'Limpar histórico',
+    val_clear_history: 'Recomeçar a conversa',
+    section_instructions: 'Instruções',
+    placeholder_instructions: 'Regras personalizadas para o assistente. Ex.: Responde sempre em português...',
+    btn_save: 'Guardar',
+    credit_images: 'Imagens',
+    credit_voice: 'Voz',
+    credit_video: 'Vídeo',
+    section_ads: 'Ver anúncios',
+    ad_image_label: '+2 créditos de imagens',
+    ad_watch: 'Ver anúncio',
+    ad_voice_label: '+2 créditos de voz',
+    section_buy: 'Comprar com Stars ⭐',
+    buy_10img: '10 imagens',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 mensagens de voz',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Pacote: tudo incluído',
+    buy_bundle_desc: '120 ⭐ · 10 img + 15 voz + 3 vídeo',
+    btn_buy: 'Comprar',
+    nav_chat: 'Chat',
+    nav_char: 'Personagem',
+    nav_settings: 'Definições',
+    nav_credits: 'Créditos',
+    toast_char_selected: 'Personagem selecionado ✓',
+    toast_char_saved: 'Personagem guardado ✓',
+    toast_too_short: 'Descrição demasiado curta',
+    toast_instructions_saved: 'Instruções guardadas ✓',
+    toast_history_cleared: (n) => 'Histórico limpo',
+    toast_no_char: 'Escolhe primeiro um personagem!',
+    toast_generating: '🎙 A gerar mensagem de voz...',
+    toast_gen_done: 'Imagem gerada ✓',
+    toast_voice_gen: '🎙 Voz pronta',
+    toast_error: (msg) => 'Erro: ' + msg,
+    toast_vision_error: (msg) => '👁 Para analisar fotos é necessário o modelo gpt-4o. Configura LLM_MODEL no Railway.',
+    toast_stt_error: (msg) => '🎙 STT não configurado. Adiciona STT_PROVIDER=whisper e STT_API_KEY no Railway.',
+    toast_no_credits: 'Créditos insuficientes',
+    sheet_style: '🎨 Estilo de comunicação',
+    sheet_tone: '🎭 Tom',
+    sheet_verbosity: '📝 Extensão das respostas',
+    sheet_language: '🌍 Idioma',
+    err_connection: 'Erro de ligação',
+    gen_analyzing: '🎨 A analisar contexto da conversa...\nA gerar imagem do personagem...',
+    gen_stub: 'Imagem gerada (rascunho)',
+    gen_no_credits: 'Créditos insuficientes',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Voz pronta').substring(0, 40),
+    confirm_clear: 'Limpar histórico?',
+    confirm_clear_msg: 'A conversa será eliminada. Esta ação não pode ser desfeita.',
+    confirm_clear_ok: 'Limpar',
+    confirm_clear_cancel: 'Cancelar',
+    custom_model_name: 'Modelo personalizado',
+    saved_ok: 'Guardado ✓',
+    notify_on: 'Notificações ativadas',
+    notify_off: 'Notificações desativadas',
+    history_cleared: 'Histórico limpo',
+    record_too_short: 'Gravação demasiado curta — segura mais tempo',
+    mic_denied: 'Acesso ao microfone negado',
+    img_only: 'Apenas imagens são suportadas',
+    img_too_big: 'Imagem demasiado grande (máx. 5 MB)',
+    chat_error: '😔 Algo correu mal. Tenta novamente.',
+    ad_loading: '📺 A processar anúncio...',
+    ad_limit: 'Limite atingido',
+    err_debug: 'Verifica a consola do navegador (F12) para mais detalhes.',
+    gender_female: 'Feminino',
+    gender_male: 'Masculino',
+    d_casual: 'Descontraído, como conversar com um amigo',
+    d_formal: 'Oficial, profissional',
+    d_friendly: 'Caloroso e amigável',
+    d_playful: 'Brincalhão, com piadas',
+    d_flirty: 'Flertador, sedutor',
+    d_intimate: 'Próximo, pessoal',
+    d_seductive: 'Sensual, sedutor',
+    d_caring: 'Carinhoso, terno',
+    d_savage: 'Sem filtros, direto',
+    d_tone_friendly: 'Caloroso e solidário',
+    d_tone_analytical: 'Lógico, estruturado',
+    d_tone_humorous: 'Com humor e sagacidade',
+    d_tone_empathetic: 'Empático, compreensivo',
+    d_tone_passionate: 'Apaixonado, expressivo',
+    d_tone_seductive: 'Sedutor',
+    d_tone_dominant: 'Confiante, dominante',
+    d_tone_submissive: 'Suave, segue o teu ritmo',
+    d_tone_teasing: 'Provocador, brincalhão',
+    d_tone_mysterious: 'Misterioso, intrigante',
+    d_tone_raw: 'Sem filtros',
+    d_short: '1–3 frases, breve',
+    d_normal: 'Resposta completa, sem excessos',
+    d_detailed: 'Detalhado, com exemplos',
+    d_lang_auto: 'Responde no idioma da tua mensagem',
+    preset_redhead_name: 'Ruiva Selvagem',               preset_redhead_desc: 'Ousada, ardente, livre',
+    preset_brunette_name: 'Morena Ardente',               preset_brunette_desc: 'Apaixonada, misteriosa',
+    preset_blonde_name: 'Loira Deslumbrante',             preset_blonde_desc: 'Radiante, descontraída, enérgica',
+    preset_furry_name: 'Furry Loba',                      preset_furry_desc: 'Selvagem, leal, misteriosa',
+    preset_rebel_name: 'Rebelde Ousado',                  preset_rebel_desc: 'Independente, carismático, sem regras',
+    preset_gentleman_name: 'Cavalheiro Refinado',         preset_gentleman_desc: 'Galante, inteligente, encantador',
+    preset_athlete_name: 'Atleta Campeão',                preset_athlete_desc: 'Forte, enérgico, determinado',
+    preset_mystery_m_name: 'Estranho Misterioso',        preset_mystery_m_desc: 'Silencioso, profundo, magnético',
+  },
+  id: {
+    status_online: 'selalu online',
+    btn_gen_image: 'Buat gambar',
+    btn_voice: 'Pesan suara',
+    placeholder_chat: 'Tulis pesan...',
+    btn_attach: 'Lampirkan foto',
+    btn_record: 'Tahan untuk merekam',
+    placeholder_caption: 'Tambahkan keterangan (opsional)',
+    btn_send_image: 'Kirim',
+    suggestion1: 'Ceritakan tentang dirimu',
+    suggestion2: 'Bagaimana harimu?',
+    suggestion3: 'Beri aku pujian',
+    suggestion4: 'Apa pendapatmu tentang aku?',
+    welcome_greeting: (name) => `Hei, ${name}!`,
+    welcome_sub: (name) => `Aku ${name} — asisten AI pribadimu. Mau ngobrol tentang apa?`,
+    hero_default_name: 'Pilih karakter',
+    hero_default_desc: 'Pilih karakter di bawah — ini akan menentukan gaya komunikasi, suara, dan pembuatan gambar',
+    section_presets: 'Preset',
+    section_custom: 'Model kustom',
+    placeholder_custom: 'Deskripsikan model idealmu: penampilan, kepribadian, gaya, suasana...',
+    btn_save_char: 'Simpan karakter',
+    custom_no_desc: 'Deskripsikan karaktermu di bawah',
+    section_style: 'Gaya komunikasi',
+    label_style: 'Gaya',
+    label_tone: 'Nada',
+    label_volume: 'Panjang jawaban',
+    label_language: 'Bahasa',
+    section_more: 'Lainnya',
+    label_notifications: 'Notifikasi',
+    val_notifications: 'Setiap 12 jam',
+    label_clear_history: 'Hapus riwayat',
+    val_clear_history: 'Mulai percakapan baru',
+    section_instructions: 'Instruksi',
+    placeholder_instructions: 'Aturan kustom untuk asisten. Mis.: Selalu jawab dalam bahasa Indonesia...',
+    btn_save: 'Simpan',
+    credit_images: 'Gambar',
+    credit_voice: 'Suara',
+    credit_video: 'Video',
+    section_ads: 'Tonton iklan',
+    ad_image_label: '+2 kredit gambar',
+    ad_watch: 'Tonton iklan',
+    ad_voice_label: '+2 kredit suara',
+    section_buy: 'Beli dengan Stars ⭐',
+    buy_10img: '10 gambar',
+    buy_50stars: '50 ⭐ Telegram Stars',
+    buy_15voice: '15 pesan suara',
+    buy_30stars: '30 ⭐ Telegram Stars',
+    buy_bundle: 'Paket: semua termasuk',
+    buy_bundle_desc: '120 ⭐ · 10 gbr + 15 suara + 3 video',
+    btn_buy: 'Beli',
+    nav_chat: 'Chat',
+    nav_char: 'Karakter',
+    nav_settings: 'Pengaturan',
+    nav_credits: 'Kredit',
+    toast_char_selected: 'Karakter dipilih ✓',
+    toast_char_saved: 'Karakter disimpan ✓',
+    toast_too_short: 'Deskripsi terlalu pendek',
+    toast_instructions_saved: 'Instruksi disimpan ✓',
+    toast_history_cleared: (n) => 'Riwayat dihapus',
+    toast_no_char: 'Pilih karakter terlebih dahulu!',
+    toast_generating: '🎙 Membuat pesan suara...',
+    toast_gen_done: 'Gambar dibuat ✓',
+    toast_voice_gen: '🎙 Suara siap',
+    toast_error: (msg) => 'Kesalahan: ' + msg,
+    toast_vision_error: (msg) => '👁 Untuk menganalisis foto diperlukan model gpt-4o. Atur LLM_MODEL di Railway.',
+    toast_stt_error: (msg) => '🎙 STT belum dikonfigurasi. Tambahkan STT_PROVIDER=whisper dan STT_API_KEY di Railway.',
+    toast_no_credits: 'Kredit tidak cukup',
+    sheet_style: '🎨 Gaya komunikasi',
+    sheet_tone: '🎭 Nada',
+    sheet_verbosity: '📝 Panjang jawaban',
+    sheet_language: '🌍 Bahasa',
+    err_connection: 'Kesalahan koneksi',
+    gen_analyzing: '🎨 Menganalisis konteks percakapan...\nMembuat gambar karakter...',
+    gen_stub: 'Gambar dibuat (draf)',
+    gen_no_credits: 'Kredit tidak cukup',
+    gen_voice_ready: (text) => '🎙 ' + (text || 'Suara siap').substring(0, 40),
+    confirm_clear: 'Hapus riwayat?',
+    confirm_clear_msg: 'Percakapan akan dihapus. Tindakan ini tidak dapat dibatalkan.',
+    confirm_clear_ok: 'Hapus',
+    confirm_clear_cancel: 'Batal',
+    custom_model_name: 'Model kustom',
+    saved_ok: 'Disimpan ✓',
+    notify_on: 'Notifikasi diaktifkan',
+    notify_off: 'Notifikasi dinonaktifkan',
+    history_cleared: 'Riwayat dihapus',
+    record_too_short: 'Rekaman terlalu pendek — tahan lebih lama',
+    mic_denied: 'Akses mikrofon ditolak',
+    img_only: 'Hanya gambar yang didukung',
+    img_too_big: 'Gambar terlalu besar (maks. 5 MB)',
+    chat_error: '😔 Terjadi kesalahan. Coba lagi.',
+    ad_loading: '📺 Memproses penayangan iklan...',
+    ad_limit: 'Batas tercapai',
+    err_debug: 'Periksa konsol browser (F12) untuk detail.',
+    gender_female: 'Perempuan',
+    gender_male: 'Laki-laki',
+    d_casual: 'Santai, seperti chat dengan teman',
+    d_formal: 'Resmi, profesional',
+    d_friendly: 'Hangat dan ramah',
+    d_playful: 'Ceria, dengan candaan',
+    d_flirty: 'Menggoda, merayu',
+    d_intimate: 'Dekat, personal',
+    d_seductive: 'Sensual, menggoda',
+    d_caring: 'Penuh perhatian, lembut',
+    d_savage: 'Tanpa filter, blak-blakan',
+    d_tone_friendly: 'Hangat dan suportif',
+    d_tone_analytical: 'Logis, terstruktur',
+    d_tone_humorous: 'Dengan humor dan kecerdasan',
+    d_tone_empathetic: 'Empati, penuh pengertian',
+    d_tone_passionate: 'Bersemangat, ekspresif',
+    d_tone_seductive: 'Menggoda',
+    d_tone_dominant: 'Percaya diri, tegas',
+    d_tone_submissive: 'Lembut, mengikuti arahmu',
+    d_tone_teasing: 'Menggoda, provokatif',
+    d_tone_mysterious: 'Misterius, membuat penasaran',
+    d_tone_raw: 'Tanpa filter',
+    d_short: '1–3 kalimat, singkat',
+    d_normal: 'Jawaban lengkap, tanpa basa-basi',
+    d_detailed: 'Rinci, dengan contoh',
+    d_lang_auto: 'Membalas dalam bahasa pesanmu',
+    preset_redhead_name: 'Si Rambut Merah Liar',         preset_redhead_desc: 'Berani, penuh gairah, bebas',
+    preset_brunette_name: 'Si Rambut Cokelat Menggoda',  preset_brunette_desc: 'Penuh semangat, misterius',
+    preset_blonde_name: 'Si Rambut Pirang Memukau',      preset_blonde_desc: 'Cerah, santai, energik',
+    preset_furry_name: 'Furry Serigala Betina',           preset_furry_desc: 'Liar, setia, misterius',
+    preset_rebel_name: 'Pemberontak Berani',              preset_rebel_desc: 'Mandiri, karismatik, tanpa aturan',
+    preset_gentleman_name: 'Pria Berbudaya',              preset_gentleman_desc: 'Sopan, cerdas, menawan',
+    preset_athlete_name: 'Atlet Juara',                   preset_athlete_desc: 'Kuat, energik, penuh tekad',
+    preset_mystery_m_name: 'Orang Asing Misterius',      preset_mystery_m_desc: 'Pendiam, dalam, menarik',
+  },
+};
+
+// ── Sheet options ─────────────────────────────────────────
+// Titles are resolved lazily via t() so they respect the current LANG
+const SHEET_OPTIONS = {
+  style: {
+    get title() { return t('sheet_style'); },
+    options: [
+      {v:'casual',       l:'😎 Casual',       d:'d_casual'},
+      {v:'formal',       l:'🧳 Formal',        d:'d_formal'},
+      {v:'friendly',     l:'🤗 Friendly',      d:'d_friendly'},
+      {v:'playful',      l:'🎉 Playful',       d:'d_playful'},
+      {v:'flirty',       l:'😏 Flirty',        d:'d_flirty'},
+      {v:'intimate',     l:'🥰 Intimate',      d:'d_intimate'},
+      {v:'seductive',    l:'🔥 Seductive',     d:'d_seductive'},
+      {v:'caring',       l:'💗 Caring',        d:'d_caring'},
+      {v:'savage',       l:'😈 Savage',        d:'d_savage'},
+    ]
+  },
+  tone: {
+    get title() { return t('sheet_tone'); },
+    options: [
+      {v:'friendly',   l:'🙂 Friendly',    d:'d_tone_friendly'},
+      {v:'analytical', l:'🧠 Analytical',  d:'d_tone_analytical'},
+      {v:'humorous',   l:'😄 Humorous',    d:'d_tone_humorous'},
+      {v:'empathetic', l:'💙 Empathetic',  d:'d_tone_empathetic'},
+      {v:'passionate', l:'❤️ Passionate',  d:'d_tone_passionate'},
+      {v:'seductive',  l:'😘 Seductive',   d:'d_tone_seductive'},
+      {v:'dominant',   l:'👑 Dominant',    d:'d_tone_dominant'},
+      {v:'submissive', l:'🌸 Submissive',  d:'d_tone_submissive'},
+      {v:'teasing',    l:'😜 Teasing',     d:'d_tone_teasing'},
+      {v:'mysterious', l:'🌙 Mysterious',  d:'d_tone_mysterious'},
+      {v:'raw',        l:'⚡ Raw',         d:'d_tone_raw'},
+    ]
+  },
+  verbosity: {
+    get title() { return t('sheet_verbosity'); },
+    options: [
+      {v:'short',    l:'✂️ Short',    d:'d_short'},
+      {v:'normal',   l:'📄 Normal',   d:'d_normal'},
+      {v:'detailed', l:'📚 Detailed', d:'d_detailed'},
+    ]
+  },
+  language: {
+    get title() { return t('sheet_language'); },
+    options: [
+      {v:'auto',       l:'🌐 Авто',        d:'d_lang_auto'},
+      {v:'Russian',    l:'🇷🇺 Русский',    d:'Всегда по-русски'},
+      {v:'English',    l:'🇬🇧 English',    d:'Always in English'},
+      {v:'Polish',     l:'🇵🇱 Polski',     d:'Zawsze po polsku'},
+      {v:'German',     l:'🇩🇪 Deutsch',    d:'Immer auf Deutsch'},
+      {v:'French',     l:'🇫🇷 Français',   d:'Toujours en français'},
+      {v:'Spanish',    l:'🇪🇸 Español',    d:'Siempre en español'},
+      {v:'Portuguese', l:'🇵🇹 Português',  d:'Sempre em português'},
+      {v:'Indonesian', l:'🇮🇩 Indonesia',  d:'Selalu dalam bahasa Indonesia'},
+    ]
+  },
+};
+
+// ════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════
+async function init() {
+  try {
+    // Load profile + credits in parallel
+    const [profile, credits] = await Promise.all([
+      api('GET', '/api/profile'),
+      api('GET', '/api/credits'),
+    ]);
+
+    S.profile  = profile;
+    S.credits  = credits;
+
+    // Load character
+    try {
+      const char = await api('GET', '/api/profile/character');
+      S.character = char;
+    } catch(e) {}
+
+    // Load history
+    await loadHistory();
+
+    updateLang(profile.language);
+    applyLang();
+    applyProfile();
+    applyCredits();
+    renderCharView();
+
+  } catch(e) {
+    console.error('Init error:', e);
+    // Show detailed error for debugging
+    const msg = e?.message || String(e);
+    showToast(t('toast_error', msg.substring(0, 60)));
+    console.error('Full error:', msg);
+
+    // Still hide loader and show empty state
+    document.getElementById('chatMessages').innerHTML = `
+      <div class="welcome">
+        <div class="welcome-glow">⚠️</div>
+        <div class="welcome-title" style="font-size:16px">${t('err_connection')}</div>
+        <div class="welcome-sub">${msg.substring(0,100)}<br><br>
+        ${t('err_debug')}</div>
+      </div>`;
+  }
+
+  // Hide loader
+  setTimeout(() => {
+    document.getElementById('loadingScreen').classList.add('hidden');
+  }, 800);
+}
+
+// ════════════════════════════════════════════════════════
+// PROFILE
+// ════════════════════════════════════════════════════════
+function applyProfile() {
+  const p = S.profile;
+  if (!p) return;
+  document.getElementById('valStyle').textContent     = p.style     || 'casual';
+  document.getElementById('valTone').textContent      = p.tone      || 'friendly';
+  document.getElementById('valVerbosity').textContent = p.verbosity || 'normal';
+  document.getElementById('valLanguage').textContent  = p.language  || 'auto';
+  if (p.custom_instructions)
+    document.getElementById('instructionsInput').value = p.custom_instructions;
+
+  const tog = document.getElementById('notifyToggle');
+  if (p.notifications_enabled) tog.classList.add('on');
+  else tog.classList.remove('on');
+
+  updateLang(p.language);
+  applyLang();
+}
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const text = t(el.dataset.i18n);
+    if (text !== el.dataset.i18n) el.textContent = text;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const text = t(el.dataset.i18nPlaceholder);
+    if (text !== el.dataset.i18nPlaceholder) el.setAttribute('placeholder', text);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const text = t(el.dataset.i18nTitle);
+    if (text !== el.dataset.i18nTitle) el.setAttribute('title', text);
+  });
+}
+
+// ════════════════════════════════════════════════════════
+// CREDITS
+// ════════════════════════════════════════════════════════
+function applyCredits() {
+  const c = S.credits;
+  if (!c) return;
+  const set = (id, rid, key) => {
+    const d = c[key];
+    if (!d) return;
+    document.getElementById(id).textContent  = d.total ?? '—';
+    document.getElementById(rid).textContent = d.reset_in_human ? `↺ ${d.reset_in_human}` : '';
+  };
+  set('cImg',   'cImgReset',   'image');
+  set('cVoice', 'cVoiceReset', 'voice');
+  set('cVideo', 'cVideoReset', 'video');
+}
+
+// ════════════════════════════════════════════════════════
+// CHARACTER
+// ════════════════════════════════════════════════════════
+function renderCharView() {
+  const key = S.character?.character_key;
+  const preset = PRESETS.find(p => p.key === key);
+  const isCustom = key === 'custom';
+
+  if (preset) {
+    document.getElementById('heroEmoji').textContent     = preset.emoji;
+    document.getElementById('heroName').textContent      = t(preset.nk);
+    document.getElementById('heroDesc').textContent      = t(preset.dk);
+    document.getElementById('headerAvatar').textContent  = preset.emoji;
+    document.getElementById('headerName').textContent    = t(preset.nk);
+  } else if (isCustom) {
+    const desc = S.character?.custom || '';
+    document.getElementById('heroEmoji').textContent     = '✏️';
+    document.getElementById('heroName').textContent      = t('custom_model_name');
+    document.getElementById('heroDesc').textContent      = desc ? desc.substring(0,80)+'…' : t('custom_no_desc');
+    document.getElementById('headerAvatar').textContent  = '✏️';
+    document.getElementById('headerName').textContent    = t('custom_model_name');
+    const input = document.getElementById('customCharInput');
+    if (input && desc && !input.value) input.value = desc;
+  }
+
+  // Sync gender toggle state
+  document.querySelectorAll('.gender-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.gender === S.charGender));
+
+  // Grid — preset cards (filtered by gender) + custom card
+  const grid = document.getElementById('charGrid');
+  const filtered = PRESETS.filter(p => p.gender === S.charGender);
+  const presetCards = filtered.map(p => `
+    <div class="char-card ${key === p.key ? 'selected' : ''}"
+         onclick="selectChar('${p.key}')">
+      <div class="char-card-check">✓</div>
+      <span class="char-card-emoji">${p.emoji}</span>
+      <div class="char-card-name">${t(p.nk)}</div>
+      <div class="char-card-desc">${t(p.dk)}</div>
+    </div>`).join('');
+
+  const customCard = `
+    <div class="char-card ${isCustom ? 'selected' : ''}"
+         onclick="document.getElementById('customCharInput').focus()">
+      <div class="char-card-check">✓</div>
+      <span class="char-card-emoji">✏️</span>
+      <div class="char-card-name">${t('custom_model_name')}</div>
+      <div class="char-card-desc">${isCustom && S.character?.custom ? S.character.custom.substring(0,40)+'…' : t('custom_no_desc')}</div>
+    </div>`;
+
+  grid.innerHTML = presetCards + customCard;
+}
+
+async function selectChar(key) {
+  try {
+    await api('PUT', '/api/profile/character', { character_key: key, character_custom: '' });
+    S.character = { character_key: key };
+    renderCharView();
+    showToast(t('toast_char_selected'));
+    setTimeout(() => showView('chat'), 600);
+  } catch(e) {
+    showToast(t('toast_error', e.message));
+  }
+}
+
+async function saveCustomChar() {
+  const text = document.getElementById('customCharInput').value.trim();
+  if (text.length < 10) { showToast(t('toast_too_short')); return; }
+  try {
+    await api('PUT', '/api/profile/character', { character_key: 'custom', character_custom: text });
+    S.character = { character_key: 'custom', custom: text };
+    renderCharView();
+    showToast(t('toast_char_saved'));
+  } catch(e) {
+    showToast(t('toast_error', e.message));
+  }
+}
+
+function setCharGender(gender) {
+  S.charGender = gender;
+  renderCharView();
+}
+
+// ════════════════════════════════════════════════════════
+// CHAT
+// ════════════════════════════════════════════════════════
+async function loadHistory() {
+  try {
+    const data = await api('GET', '/api/chat/history?limit=30');
+    const msgs = data.history || [];
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = '';
+
+    if (msgs.length === 0) {
+      renderWelcome();
+      return;
+    }
+
+    document.getElementById('suggestions').style.display = 'none';
+    msgs.forEach(m => appendMessage(m.role === 'user' ? 'user' : 'ai', m.content, false));
+    scrollToBottom();
+  } catch(e) {
+    renderWelcome();
+  }
+}
+
+function renderWelcome() {
+  const name = S.character?.preset?.name || TG_USER.first_name || 'друг';
+  const emoji = PRESETS.find(p=>p.key===S.character?.character_key)?.emoji || '🍬';
+  const firstName = TG_USER.first_name || 'друг';
+  document.getElementById('chatMessages').innerHTML = `
+    <div class="welcome">
+      <div class="welcome-glow">${emoji}</div>
+      <div class="welcome-title">${t('welcome_greeting', firstName)}</div>
+      <div class="welcome-sub">${t('welcome_sub', name)}</div>
+    </div>`;
+}
+
+function appendMessage(role, text, animate=true) {
+  const container = document.getElementById('chatMessages');
+
+  // Remove welcome if present
+  const welcome = container.querySelector('.welcome');
+  if (welcome) welcome.remove();
+
+  const msgEl = document.createElement('div');
+  msgEl.className = `msg ${role}`;
+  if (!animate) msgEl.style.animation = 'none';
+
+  const emoji = PRESETS.find(p=>p.key===S.character?.character_key)?.emoji || '🍬';
+  const avatarHtml = role === 'ai'
+    ? `<div class="msg-avatar">${emoji}</div>` : '';
+
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+  msgEl.innerHTML = `
+    ${avatarHtml}
+    <div>
+      <div class="msg-bubble">${escHtml(text)}</div>
+      <div class="msg-time">${time}</div>
+    </div>`;
+
+  container.appendChild(msgEl);
+  if (animate) scrollToBottom();
+}
+
+function showTyping() {
+  const container = document.getElementById('chatMessages');
+  const el = document.createElement('div');
+  el.className = 'msg ai';
+  el.id = 'typingIndicator';
+  const emoji = PRESETS.find(p=>p.key===S.character?.character_key)?.emoji || '🍬';
+  el.innerHTML = `
+    <div class="msg-avatar">${emoji}</div>
+    <div class="typing-bubble">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>`;
+  container.appendChild(el);
+  scrollToBottom();
+}
+
+function hideTyping() {
+  document.getElementById('typingIndicator')?.remove();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text  = input.value.trim();
+  if (!text || S.loading) return;
+
+  input.value = '';
+  autoResize(input);
+  document.getElementById('suggestions').style.display = 'none';
+
+  appendMessage('user', text);
+  showTyping();
+  S.loading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const data = await api('POST', '/api/chat', { message: text });
+    hideTyping();
+    appendMessage('ai', data.reply);
+  } catch(e) {
+    hideTyping();
+    appendMessage('ai', t('chat_error'));
+    showToast(t('toast_error', e.message));
+  } finally {
+    S.loading = false;
+    document.getElementById('sendBtn').disabled = false;
+  }
+}
+
+function sendSuggestion(el) {
+  document.getElementById('chatInput').value = el.textContent;
+  sendMessage();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+// ════════════════════════════════════════════════════════
+// GENERATE IMAGE
+// ════════════════════════════════════════════════════════
+async function generateImage() {
+  if (!S.character?.character_key) {
+    showToast(t('toast_no_char'));
+    showView('char');
+    return;
+  }
+  showView('credits');
+
+  const area = document.getElementById('imageArea');
+  area.innerHTML = `
+    <div class="generating">
+      <div class="gen-spinner"></div>
+      <div class="gen-text">${t('gen_analyzing').replace('\n','<br>')}</div>
+    </div>`;
+
+  try {
+    const data = await api('POST', '/api/generate/imagine', { hint: '' });
+
+    if (data.image_base64) {
+      area.innerHTML = `
+        <div class="img-preview">
+          <img src="data:image/jpeg;base64,${data.image_base64}" alt="Generated"/>
+          <div class="img-actions">
+            <div class="img-btn" onclick="generateImage()">🔄</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);padding:4px">
+          <i>${escHtml((data.revised_prompt||'').substring(0,100))}...</i>
+        </div>`;
+    } else {
+      area.innerHTML = `<div style="text-align:center;color:var(--muted);padding:20px">${t('gen_stub')}</div>`;
+    }
+
+    // Refresh credits
+    S.credits = await api('GET', '/api/credits');
+    applyCredits();
+    showToast(t('toast_gen_done'));
+
+  } catch(e) {
+    const msg = e.message.includes('no_credits')
+      ? t('gen_no_credits')
+      : t('toast_error', e.message);
+    area.innerHTML = `<div style="text-align:center;color:var(--danger);padding:20px">${msg}</div>`;
+    showToast(msg);
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// GENERATE VOICE
+// ════════════════════════════════════════════════════════
+async function generateVoice() {
+  if (!S.character?.character_key) {
+    showToast(t('toast_no_char'));
+    return;
+  }
+  showToast(t('toast_generating'));
+  try {
+    const data = await api('POST', '/api/generate/voice', { text: '' });
+    if (data.audio_base64) {
+      const audio = new Audio('data:audio/ogg;base64,' + data.audio_base64);
+      audio.play().catch(()=>{});
+      showToast(t('gen_voice_ready', data.text));
+    }
+    S.credits = await api('GET', '/api/credits');
+    applyCredits();
+  } catch(e) {
+    showToast(t('toast_error', e.message));
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════════
+function openSheet(key) {
+  S.sheetKey = key;
+  const cfg = SHEET_OPTIONS[key];
+  document.getElementById('sheetTitle').textContent = cfg.title;
+
+  const cur = S.profile?.[key] || '';
+  document.getElementById('sheetContent').innerHTML = cfg.options.map(o => {
+    const desc = TRANSLATIONS[LANG]?.[o.d] ? t(o.d) : o.d;
+    return `
+    <div class="sheet-option ${cur===o.v?'selected':''}" onclick="selectSheetOption('${o.v}')">
+      <div class="sheet-option-icon">${o.l.split(' ')[0]}</div>
+      <div class="sheet-option-text">
+        <div class="sheet-option-label">${o.l.split(' ').slice(1).join(' ')}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${desc}</div>
+      </div>
+      <div class="sheet-option-check">✓</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sheetOverlay').classList.add('open');
+}
+
+async function selectSheetOption(value) {
+  const key = S.sheetKey;
+  closeSheet();
+  try {
+    await api('PUT', '/api/profile', { [key]: value });
+    if (S.profile) S.profile[key] = value;
+    applyProfile();
+    showToast(t('saved_ok'));
+  } catch(e) {
+    showToast(t('toast_error', e.message));
+  }
+}
+
+function closeSheet(e) {
+  if (e && e.target !== document.getElementById('sheetOverlay')) return;
+  document.getElementById('sheetOverlay').classList.remove('open');
+}
+
+async function saveInstructions() {
+  const text = document.getElementById('instructionsInput').value.trim();
+  try {
+    await api('PUT', '/api/profile', { custom_instructions: text });
+    showToast(t('toast_instructions_saved'));
+  } catch(e) {
+    showToast(t('toast_error', e.message));
+  }
+}
+
+async function toggleNotify() {
+  const cur = S.profile?.notifications_enabled ?? true;
+  const next = !cur;
+  try {
+    await api('PUT', '/api/profile', { notifications_enabled: next });
+    if (S.profile) S.profile.notifications_enabled = next;
+    const tog = document.getElementById('notifyToggle');
+    next ? tog.classList.add('on') : tog.classList.remove('on');
+    showToast(next ? t('notify_on') : t('notify_off'));
+  } catch(e) {
+    showToast(t('toast_error', e.message));
+  }
+}
+
+async function clearHistory() {
+  tg.showPopup({
+    title: t('confirm_clear'),
+    message: t('confirm_clear_msg'),
+    buttons: [
+      { id:'ok', type:'destructive', text: t('confirm_clear_ok') },
+      { id:'no', type:'cancel', text: t('confirm_clear_cancel') },
+    ]
+  }, async (btnId) => {
+    if (btnId !== 'ok') return;
+    try {
+      await api('DELETE', '/api/chat/history');
+      await loadHistory();
+      showToast(t('history_cleared'));
+    } catch(e) {
+      showToast(t('toast_error', e.message));
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════
+// CREDITS / ADS
+// ════════════════════════════════════════════════════════
+async function watchAd(type) {
+  showToast(t('ad_loading'));
+  try {
+    const data = await api('POST', '/api/credits/watch-ad', { credit_type: type });
+    if (data.success) {
+      showToast(`✅ +${data.credits_added}`);
+      S.credits = await api('GET', '/api/credits');
+      applyCredits();
+    } else {
+      showToast('⚠️ ' + (data.message || t('ad_limit')));
+    }
+  } catch(e) {
+    showToast(t('toast_error', e.message));
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view'+cap(name)).classList.add('active');
+  const nb = document.getElementById('nav-'+name);
+  if (nb) nb.classList.add('active');
+  S.view = name;
+
+  if (name === 'credits') {
+    api('GET', '/api/credits').then(d=>{S.credits=d;applyCredits();}).catch(()=>{});
+  }
+  if (name === 'char') {
+    renderCharView();
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function scrollToBottom() {
+  const c = document.getElementById('chatMessages');
+  requestAnimationFrame(()=>{ c.scrollTop = c.scrollHeight; });
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2800);
+}
+
+// ════════════════════════════════════════════════════════
+// FILE ATTACHMENT
+// ════════════════════════════════════════════════════════
+let _attachedFile   = null;
+let _attachedBlob   = null;
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Validate type
+  if (!file.type.startsWith('image/')) {
+    showToast(t('img_only'));
+    return;
+  }
+  // Validate size (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showToast(t('img_too_big'));
+    return;
+  }
+
+  _attachedFile = file;
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('imgAttachThumb').src = e.target.result;
+    document.getElementById('imgAttachPreview').style.display = 'block';
+    document.getElementById('imgCaption').value = '';
+    document.getElementById('imgCaption').focus();
+  };
+  reader.readAsDataURL(file);
+
+  // Reset input so same file can be selected again
+  event.target.value = '';
+}
+
+function cancelImage() {
+  _attachedFile = null;
+  document.getElementById('imgAttachPreview').style.display = 'none';
+  document.getElementById('imgAttachThumb').src = '';
+}
+
+async function sendImage() {
+  if (!_attachedFile) return;
+
+  const caption = document.getElementById('imgCaption').value.trim();
+  const file    = _attachedFile;
+  cancelImage();
+
+  // Show image in chat
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const container = document.getElementById('chatMessages');
+    const el = document.createElement('div');
+    el.className = 'msg user';
+    el.innerHTML = `
+      <div>
+        <div class="msg-bubble" style="padding:4px;background:linear-gradient(135deg,var(--accent),var(--accent2))">
+          <img src="${e.target.result}" style="max-width:220px;border-radius:12px;display:block"/>
+          ${caption ? `<div style="padding:6px 8px 2px;font-size:13px">${escHtml(caption)}</div>` : ''}
+        </div>
+        <div class="msg-time">${new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>`;
+    container.appendChild(el);
+    scrollToBottom();
+  };
+  reader.readAsDataURL(file);
+
+  // Show typing
+  showTyping();
+  S.loading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (caption) formData.append('caption', caption);
+
+    const headers = {};
+    if (INIT_DATA && INIT_DATA.length > 10) {
+      headers['X-Telegram-Init-Data'] = INIT_DATA;
+    } else if (TG_USER?.id) {
+      headers['X-Dev-User-Id'] = String(TG_USER.id);
+    }
+
+    const res = await fetch(API_URL + '/api/media/vision', {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    hideTyping();
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    appendMessage('ai', data.reply);
+
+  } catch(e) {
+    hideTyping();
+    const msg = e.message.includes("vision")
+      ? t('toast_vision_error', e.message)
+      : t('toast_error', e.message);
+    appendMessage('ai', msg);
+  } finally {
+    S.loading = false;
+    document.getElementById('sendBtn').disabled = false;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// VOICE RECORDING
+// ════════════════════════════════════════════════════════
+let _mediaRecorder  = null;
+let _audioChunks    = [];
+let _recordTimer    = null;
+let _recordSeconds  = 0;
+let _isRecording    = false;
+
+async function startRecording() {
+  if (_isRecording) return;
+
+  // Request mic permission
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(e) {
+    showToast(t('mic_denied'));
+    return;
+  }
+
+  _isRecording  = true;
+  _audioChunks  = [];
+  _recordSeconds = 0;
+
+  // Choose best supported format
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm')
+    ? 'audio/webm'
+    : 'audio/ogg';
+
+  _mediaRecorder = new MediaRecorder(stream, { mimeType });
+  _mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) _audioChunks.push(e.data);
+  };
+  _mediaRecorder.start(100); // collect every 100ms
+
+  // UI
+  const voiceBtn = document.getElementById('voiceBtn');
+  const timer    = document.getElementById('recordTimer');
+  voiceBtn.classList.add('recording');
+  voiceBtn.textContent = '⏹';
+  timer.classList.add('show');
+
+  _recordTimer = setInterval(() => {
+    _recordSeconds++;
+    const m = Math.floor(_recordSeconds / 60);
+    const s = String(_recordSeconds % 60).padStart(2, '0');
+    timer.textContent = `🔴 ${m}:${s}`;
+
+    // Max 60 seconds
+    if (_recordSeconds >= 60) stopRecording();
+  }, 1000);
+}
+
+async function stopRecording() {
+  if (!_isRecording || !_mediaRecorder) return;
+  _isRecording = false;
+
+  // UI reset
+  clearInterval(_recordTimer);
+  const voiceBtn = document.getElementById('voiceBtn');
+  const timer    = document.getElementById('recordTimer');
+  voiceBtn.classList.remove('recording');
+  voiceBtn.textContent = '🎙';
+  timer.classList.remove('show');
+
+  // Too short?
+  if (_recordSeconds < 1) {
+    _mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    _mediaRecorder = null;
+    showToast(t('record_too_short'));
+    return;
+  }
+
+  // Stop and get blob
+  _mediaRecorder.stop();
+  _mediaRecorder.stream.getTracks().forEach(t => t.stop());
+
+  await new Promise(resolve => { _mediaRecorder.onstop = resolve; });
+
+  const mimeType  = _mediaRecorder.mimeType;
+  const audioBlob = new Blob(_audioChunks, { type: mimeType });
+  _mediaRecorder  = null;
+
+  await sendVoiceMessage(audioBlob, mimeType);
+}
+
+async function sendVoiceMessage(audioBlob, mimeType) {
+  // Show voice message bubble
+  const container = document.getElementById('chatMessages');
+  document.getElementById('suggestions').style.display = 'none';
+
+  const el = document.createElement('div');
+  el.className = 'msg user';
+  const dur = _recordSeconds;
+  el.innerHTML = `
+    <div>
+      <div class="msg-bubble" style="display:flex;align-items:center;gap:8px;min-width:120px">
+        <span style="font-size:20px">🎙</span>
+        <div>
+          <div style="font-size:13px;font-weight:600">Голосовое</div>
+          <div style="font-size:11px;opacity:.8">${dur}с · Распознаю...</div>
+        </div>
+      </div>
+      <div class="msg-time">${new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</div>
+    </div>`;
+  container.appendChild(el);
+  scrollToBottom();
+
+  showTyping();
+  S.loading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    // Determine file extension
+    const ext = mimeType.includes('ogg') ? 'ogg'
+              : mimeType.includes('webm') ? 'webm'
+              : 'audio';
+
+    const formData = new FormData();
+    formData.append('file', audioBlob, `voice.${ext}`);
+
+    const headers = {};
+    if (INIT_DATA && INIT_DATA.length > 10) {
+      headers['X-Telegram-Init-Data'] = INIT_DATA;
+    } else if (TG_USER?.id) {
+      headers['X-Dev-User-Id'] = String(TG_USER.id);
+    }
+
+    // Step 1: transcribe
+    const sttRes = await fetch(API_URL + '/api/media/transcribe', {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!sttRes.ok) {
+      const err = await sttRes.json().catch(() => ({}));
+      throw new Error(err.detail || `STT error: HTTP ${sttRes.status}`);
+    }
+
+    const sttData    = await sttRes.json();
+    const transcript = sttData.text;
+
+    // Update bubble to show transcript
+    const bubble = el.querySelector('.msg-bubble');
+    bubble.innerHTML = `
+      <span style="font-size:16px">🎙</span>
+      <div>
+        <div style="font-size:11px;opacity:.7;margin-bottom:3px">Голосовое · ${dur}с</div>
+        <div style="font-size:13px"><i>${escHtml(transcript)}</i></div>
+      </div>`;
+
+    // Step 2: send transcript to LLM
+    const chatRes = await api('POST', '/api/chat', {
+      message: transcript,
+    });
+
+    hideTyping();
+    appendMessage('ai', chatRes.reply);
+
+  } catch(e) {
+    hideTyping();
+    const isSTTError = e.message.includes('STT') || e.message.includes('stub');
+    const msg = isSTTError
+      ? t('toast_stt_error', e.message)
+      : t('toast_error', e.message);
+
+    // Update bubble with error
+    const bubble = el.querySelector('.msg-bubble');
+    if (bubble) bubble.innerHTML = `<span style="color:var(--danger)">⚠️ ${escHtml(msg)}</span>`;
+    appendMessage('ai', msg);
+  } finally {
+    S.loading = false;
+    document.getElementById('sendBtn').disabled = false;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// START
+// ════════════════════════════════════════════════════════
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
